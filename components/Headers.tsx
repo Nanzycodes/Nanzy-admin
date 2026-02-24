@@ -19,6 +19,9 @@ import Link from "next/link";
 // import { pageRoute } from "./app-sidebar";
 import { Button } from "./ui/button";
 import { navData } from "./app-sidebar";
+import { userAvatar } from "@/lib/utils";
+import { Input } from "./ui/input";
+import { Bell } from "lucide-react";
 
 // const getToken = () => {
 //   if (typeof window !== "undefined") {
@@ -55,10 +58,10 @@ export default function Header() {
   // };
 
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between px-8 sm:pr-10">
-      <div className="flex items-center gap-4">
+    <header className="flex h-16 shrink-0 items-center justify-between px-8 py-4 sm:pr-10 border border-[#E6E6E6] rounded-[5px]">
+      <div className="flex items-center gap-2">
         {activeProject?.icon && (
-          <activeProject.icon className={`w-4.5 h-4.5 `} />
+          <activeProject.icon className={`w-4.5 h-4.5 `} fill="" />
         )}
         <p>/ {activeProject?.title}</p>
       </div>
@@ -71,20 +74,27 @@ export default function Header() {
           </div>
         )} */}
 
+        <div>
+          <Input placeholder="Search" className="w-50" />
+        </div>
+        <div className="w-7.5 h-7.5 relative rounded-[5px] bg-[#F5F5F5] overflow-hidden flex justify-center items-center ">
+          <Bell className="w-5 h-5 m-auto" fill="" />
+        </div>
+
         {/* Profile dropdown */}
         {/* <div ref={dropdownRef} className="relative">
           <div
             className="flex items-center gap-2 cursor-pointer"
             onClick={() => setDropdownOpen((prev) => !prev)}
           > */}
-        {/* <div className="w-8 h-8 relative rounded-full overflow-hidden">
-              <Image
-                src={userImage || imgplaceholder}
-                alt="Preview"
-                fill
-                style={{ objectFit: "cover" }}
-              />
-            </div> */}
+        <div className="w-7.5 h-7.5 relative rounded-[5px] bg-[#F5F5F5] overflow-hidden">
+          <Image
+            src={userImage || userAvatar}
+            alt="Preview"
+            fill
+            style={{ objectFit: "contain" }}
+          />
+        </div>
         {/* {!isMobile && <span className="capitalize">{username}</span>}
             <Image
               src={arrowlogout}

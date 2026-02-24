@@ -11,7 +11,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <AppSidebar />
         <SidebarInset>
           <Header />
-          <div className="px-6 lg:px-[56px] pb-[40px] pt-[30px]">
+          <div className="px-6 lg:px-[32px] pb-[40px] pt-7 bg-gradient-to-r from-[#f5f5f5d7] from-0% to-[#e6e5ff9f] to-2%]">
             {children}
           </div>
         </SidebarInset>

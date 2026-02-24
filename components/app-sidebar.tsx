@@ -3,15 +3,20 @@
 import * as React from "react";
 import {
   LayoutGrid,
-  Compass,
-  Bell,
-  Building2,
   SquareUser,
   Archive,
   CreditCard,
   Package,
   TrendingUp,
 } from "lucide-react";
+// import {
+//   LayoutGrid,
+//   SquareUser,
+//   Archive,
+//   CreditCard,
+//   Package,
+//   TrendingUp,
+// } from "lucide-solid";
 
 import { NavMain } from "@/components/nav-main";
 import { NavUser } from "@/components/nav-user";

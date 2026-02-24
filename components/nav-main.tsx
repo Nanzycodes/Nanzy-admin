@@ -32,6 +32,7 @@ export function NavMain({
                 <a href={item.url} className="flex items-center gap-2">
                   {item.icon && (
                     <item.icon
+                      // fill={isActive ? "#635BFF" : ""}
                       className={`w-4.5 h-4.5 ${isActive ? "text-[#635BFF]" : ""}`}
                     />
                   )}
