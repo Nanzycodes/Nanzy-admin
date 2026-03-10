@@ -1,6 +1,7 @@
 import React from "react";
 import Image from "next/image";
 import { sellerMiniImg } from "@/lib/utils";
+import { ShoppingCart, Trophy } from "lucide-react";
 
 const Sellers = () => {
   const overviewRow = Array(4).fill(0);
@@ -31,6 +32,14 @@ export const SellerItem = ({ classname }: { classname?: string }) => {
           </h3>
           <p className="text-[#9E9E9E] text-xs">10 Followers, 100 Reviews</p>
         </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <span>
+          <ShoppingCart fill="yellow" /> 9 Orders
+        </span>
+        <span>
+          <Trophy /> 95 XP
+        </span>
       </div>
 
       <span className=" text-sm ">Posted by Olamade</span>
