@@ -3,78 +3,90 @@
 import AuthLayout, { InnerContainer } from "@/components/auth-layout";
 import InputWrapper from "@/components/input-container";
 import { Button } from "@/components/ui/button";
-import Link from "next/link";
-import Image from "next/image";
 import { useForm } from "react-hook-form";
-import z from "zod";
-import { resetPasswordSchema } from "@/lib/schema";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { LockKeyhole } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
+import adminAuthApi from "@/lib/auth";
 
-type FormValues = z.infer<typeof resetPasswordSchema>;
+type FormValues = {
+  new_password: string;
+  new_password_confirm: string;
+};
 
-function Page() {
+export default function ResetPasswordPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const uid = searchParams.get("uid") || "";
+  const token = searchParams.get("token") || "";
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+
   const { control, handleSubmit } = useForm<FormValues>({
-    resolver: zodResolver(resetPasswordSchema),
+    defaultValues: { new_password: "", new_password_confirm: "" },
   });
-  const onSubmit = (data: any) => {
-    // const payload: loginPayload = {
-    //   email: data.email,
-    // };
-    console.log(data);
+
+  const onSubmit = async (data: FormValues) => {
+    if (data.new_password !== data.new_password_confirm) {
+      setError("Passwords do not match");
+      return;
+    }
+
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const response = await adminAuthApi.resetPassword({
+        uid,
+        token,
+        new_password: data.new_password,
+        new_password_confirm: data.new_password_confirm,
+      });
+
+      console.log("Reset password response:", response);
+
+      if (response.uid && response.token) {
+        router.push("/sign-in"); // redirect to login
+      } else {
+        setError("Failed to reset password. Please try again.");
+      }
+    } catch (err: any) {
+      console.error("Reset password API error:", err);
+      setError(err.response?.data?.message || "Something went wrong");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <AuthLayout>
       <InnerContainer>
-        <div className="flex flex-col gap-0.5 mb-5">
-          <h1 className="font-mono text-[32px] font-bold">Reset Password</h1>
-          <p className="text-sm text-[#616161]">Please enter a new password</p>
-        </div>
+        <h1 className="font-mono text-[32px] font-bold mb-2">Reset Password</h1>
+        <p className="text-sm text-[#616161] mb-4">
+          Enter your new password
+        </p>
 
-        <form
-          className="flex flex-col gap-y-4 w-full mb-5.5"
-          onSubmit={handleSubmit(onSubmit)}
-        >
-          <div>
-            <InputWrapper
-              type="password"
-              name="password"
-              placeholder="Enter your password here"
-              control={control}
-              startIcon={<LockKeyhole size={16} className="text-primary" />}
-            />
-          </div>
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+          <InputWrapper
+            type="password"
+            name="new_password"
+            placeholder="New Password"
+            control={control}
+          />
+          <InputWrapper
+            type="password"
+            name="new_password_confirm"
+            placeholder="Confirm New Password"
+            control={control}
+          />
 
-          <div>
-            <InputWrapper
-              type="password"
-              name="password"
-              placeholder="Confirm your new password here"
-              control={control}
-              startIcon={<LockKeyhole size={16} className="text-primary" />}
-            />
-          </div>
-
-          <Button
-            type="submit"
-            // disabled={isPending}
-            className="w-full rounded-[5px] bg-primary text-sm text-[#fff] py-5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Submit
-            {/* {isPending ? "Logging in..." : "Login"} */}
-            {/* {!isPending && <Image src={rightArrow2} alt="go right" />} */}
+          <Button type="submit" disabled={isLoading || !uid || !token}>
+            {isLoading ? "Submitting..." : "Submit"}
           </Button>
         </form>
 
-        <div className="flex justify-end">
-          <Link href="/sign-in" className="text-sm">
-            Back to login
-          </Link>
-        </div>
+        {error && <p className="text-red-500 mt-2">{error}</p>}
       </InnerContainer>
     </AuthLayout>
   );
 }
-
-export default Page;
