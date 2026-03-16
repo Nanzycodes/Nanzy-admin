@@ -1,43 +1,95 @@
 "use client";
 
 import AuthLayout, { InnerContainer } from "@/components/auth-layout";
+import InputWrapper from "@/components/input-container";
 import { Button } from "@/components/ui/button";
-import Link from "next/link";
-// import { LockKeyhole, Mail } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { LockKeyhole } from "lucide-react";
+import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import adminAuthApi from "@/lib/auth";
+import {z} from "zod";
 
-function Page() {
-  //   const onSubmit = (data: any) => {
+// Validation
+const inviteSchema = z
+  .object({
+    password: z.string().min(6, "Password must be at least 6 characters"),
+    password_confirm: z.string().min(6, "Passwords must match"),
+  })
+  .refine((data) => data.password === data.password_confirm, {
+    message: "Passwords do not match",
+    path: ["password_confirm"],
+  });
 
-  //     console.log(data);
-  //   };
+type FormValues = z.infer<typeof inviteSchema>;
+
+export default function InvitePage() {
+  const router = useRouter();
+  const token = useSearchParams().get("token") || "";
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const { control, handleSubmit } = useForm<FormValues>({
+    resolver: zodResolver(inviteSchema),
+    defaultValues: { password: "", password_confirm: "" },
+  });
+
+  const onSubmit = async (data: FormValues) => {
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const response = await adminAuthApi.acceptInvite({
+        token,
+        password: data.password,
+        password_confirm: data.password_confirm,
+      });
+
+      if (response.success) {
+        router.push("/login?reset=true"); // Optional: redirect to login
+      } else {
+        setError(response.message || "Failed to accept invite. Please try again.");
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || "Something went wrong");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <AuthLayout>
       <InnerContainer>
-        <div className="flex flex-col gap-1 mb-5">
-          <h1 className="font-mono text-[32px] font-bold">Welcome John! 🎉</h1>
-          <p className="text-sm text-[#616161]">
-            You’ve been invited to access Pearly admin dashboard. Get started by
-            setting up your account and exploring your dashboard.
-          </p>
+        <h1 className="font-mono text-[32px] font-bold mb-2">Welcome! 🎉</h1>
+        <p className="text-sm text-[#616161] mb-2">
+          Set your password to access the dashboard.
+        </p>
 
-          <p className="text-sm text-[#9E9E9E]">
-            Click on accept invite to continue{" "}
-          </p>
-        </div>
+        {token === "" && <p className="text-red-500">⚠️ No token found in URL.</p>}
 
-        <Button
-          type="submit"
-          // disabled={isPending}
-          className="w-full rounded-[5px] bg-primary text-sm text-[#fff] py-5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Accept Invite
-          {/* {isPending ? "Logging in..." : "Login"} */}
-          {/* {!isPending && <Image src={rightArrow2} alt="go right" />} */}
-        </Button>
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+          <InputWrapper
+            type="password"
+            name="password"
+            placeholder="Enter your password"
+            control={control}
+            startIcon={<LockKeyhole size={16} />}
+          />
+          <InputWrapper
+            type="password"
+            name="password_confirm"
+            placeholder="Confirm password"
+            control={control}
+            startIcon={<LockKeyhole size={16} />}
+          />
+          <Button type="submit" disabled={isLoading || token === ""}>
+            {isLoading ? "Processing..." : "Accept Invite"}
+          </Button>
+        </form>
+
+        {error && <p className="text-red-500 mt-2">{error}</p>}
       </InnerContainer>
     </AuthLayout>
   );
 }
-
-export default Page;

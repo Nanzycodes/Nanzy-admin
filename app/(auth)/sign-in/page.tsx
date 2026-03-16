@@ -4,25 +4,57 @@ import AuthLayout, { InnerContainer } from "@/components/auth-layout";
 import InputWrapper from "@/components/input-container";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import Image from "next/image";
 import { useForm } from "react-hook-form";
-import z from "zod";
-import { loginSchema } from "@/lib/schema";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { LockKeyhole, Mail } from "lucide-react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import adminAuthApi from "@/lib/auth"; // Admin Auth API
+import { loginSchema } from "@/lib/schema";
+import z from "zod";
 
 type FormValues = z.infer<typeof loginSchema>;
 
-function Page() {
+export default function LoginPage() {
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+
   const { control, handleSubmit } = useForm<FormValues>({
     resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
   });
-  const onSubmit = (data: any) => {
-    // const payload: loginPayload = {
-    //   email: data.email,
-    //   password: data.password,
-    // };
-    console.log(data);
+
+  const onSubmit = async (data: FormValues) => {
+    setIsLoading(true);
+    setError("");
+
+    try {
+      // --login that matches API doc ---
+      const response = await adminAuthApi.login({
+        email: data.email,
+        password: data.password,
+      });
+console.log("Login response:", response);
+      // consider API response format: { success, message, data: { access, refresh, ... } }
+      if (response.success) {
+        router.push("/dashboard"); // redirect after successful login
+      } else {
+        setError(response.message || "Login failed. Please check your credentials.");
+      }
+    } catch (err: any) {
+      console.error("Login API error:", err);
+      setError(
+        err.response?.data?.message ||
+        JSON.stringify(err.response?.data) ||
+        "Login failed"
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -39,34 +71,28 @@ function Page() {
           className="flex flex-col gap-y-4 w-full mb-5.5"
           onSubmit={handleSubmit(onSubmit)}
         >
-          <div>
-            <InputWrapper
-              type="email"
-              name="email"
-              placeholder="Enter your email here"
-              control={control}
-              startIcon={<Mail size={16} className="text-primary" />}
-            />
-          </div>
+          <InputWrapper
+            type="email"
+            name="email"
+            placeholder="Enter your email here"
+            control={control}
+            startIcon={<Mail size={16} className="text-primary" />}
+          />
 
-          <div>
-            <InputWrapper
-              type="password"
-              name="password"
-              placeholder="Enter your password here"
-              control={control}
-              startIcon={<LockKeyhole size={16} className="text-primary" />}
-            />
-          </div>
+          <InputWrapper
+            type="password"
+            name="password"
+            placeholder="Enter your password here"
+            control={control}
+            startIcon={<LockKeyhole size={16} className="text-primary" />}
+          />
 
           <Button
             type="submit"
-            // disabled={isPending}
-            className="w-full rounded-[5px] bg-primary text-sm text-[#fff] py-5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full rounded-[5px] bg-primary text-sm text-white py-5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isLoading}
           >
-            Login
-            {/* {isPending ? "Logging in..." : "Login"} */}
-            {/* {!isPending && <Image src={rightArrow2} alt="go right" />} */}
+            {isLoading ? "Logging in..." : "Login"}
           </Button>
         </form>
 
@@ -78,9 +104,13 @@ function Page() {
             </Link>
           </p>
         </div>
+
+        {error && (
+          <p className="mt-4 text-sm text-red-500">
+            {error}
+          </p>
+        )}
       </InnerContainer>
     </AuthLayout>
   );
 }
-
-export default Page;
