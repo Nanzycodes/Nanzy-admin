@@ -4,70 +4,71 @@ import AuthLayout, { InnerContainer } from "@/components/auth-layout";
 import InputWrapper from "@/components/input-container";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import Image from "next/image";
 import { useForm } from "react-hook-form";
-import z from "zod";
-import { emailSchema } from "@/lib/schema";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Mail } from "lucide-react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import adminAuthApi from "@/lib/auth";
 
-type FormValues = z.infer<typeof emailSchema>;
+type FormValues = { email: string };
 
-function Page() {
+export default function ForgotPasswordPage() {
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
   const { control, handleSubmit } = useForm<FormValues>({
-    resolver: zodResolver(emailSchema),
+    defaultValues: { email: "" },
   });
-  const onSubmit = (data: any) => {
-    // const payload: loginPayload = {
-    //   email: data.email,
-    //   password: data.password,
-    // };
-    console.log(data);
+
+  const onSubmit = async (data: FormValues) => {
+    setIsLoading(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await adminAuthApi.forgotPassword({ email: data.email });
+      console.log("Forgot password response:", response);
+
+      // Treat non-error (2xx) responses as successful, but still display a message if the API explicitly says it failed.
+      if (response.success === false) {
+        setError(response.message || JSON.stringify(response));
+      } else {
+        const email = response.data?.email || data.email;
+        setSuccess(`Password reset email sent to ${email}`);
+        // No redirect - show success message on the same page
+      }
+    } catch (err: any) {
+      console.error("API error:", err);
+      setError(err.response?.data?.message || "Something went wrong");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <AuthLayout>
       <InnerContainer>
-        <div className="flex flex-col gap-0.5 mb-5">
-          <h1 className="font-mono text-[32px] font-bold">Forgot Password</h1>
-          <p className="text-sm text-[#616161]">
-            Password reset instructions will be sent to your mail
-          </p>
-        </div>
+        <h1 className="font-mono text-[32px] font-bold">Forgot Password</h1>
+        <p className="text-sm text-[#616161] mb-4">
+          Enter your email to receive a password reset link
+        </p>
 
-        <form
-          className="flex flex-col gap-y-4 w-full mb-5.5"
-          onSubmit={handleSubmit(onSubmit)}
-        >
-          <div>
-            <InputWrapper
-              type="email"
-              name="email"
-              placeholder="Enter your email here"
-              control={control}
-              startIcon={<Mail size={16} className="text-primary" />}
-            />
-          </div>
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+          <InputWrapper type="email" name="email" placeholder="Email" control={control} />
 
-          <Button
-            type="submit"
-            // disabled={isPending}
-            className="w-full rounded-[5px] bg-primary text-sm text-[#fff] py-5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Submit
-            {/* {isPending ? "Logging in..." : "Login"} */}
-            {/* {!isPending && <Image src={rightArrow2} alt="go right" />} */}
+          <Button type="submit" disabled={isLoading || !!success}>
+            {isLoading ? "Submitting..." : success ? "Email Sent" : "Submit"}
           </Button>
         </form>
 
-        <div className="flex justify-end">
-          <Link href="/sign-in" className="text-sm">
-            Back to login
-          </Link>
-        </div>
+        {error && <p className="text-red-500 mt-2">{error}</p>}
+        {success && <p className="text-green-500 mt-2">{success}</p>}
+
+        <Link href="/sign-in" className="text-sm mt-4 block">
+          Back to login
+        </Link>
       </InnerContainer>
     </AuthLayout>
   );
 }
-
-export default Page;
