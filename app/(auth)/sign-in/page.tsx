@@ -38,12 +38,12 @@ export default function LoginPage() {
         email: data.email,
         password: data.password,
       });
-
-      // ---  "email" ---
-      if (response.email) {
+console.log("Login response:", response);
+      // consider API response format: { success, message, data: { access, refresh, ... } }
+      if (response.success) {
         router.push("/dashboard"); // redirect after successful login
       } else {
-        setError("Login failed. Please check your credentials.");
+        setError(response.message || "Login failed. Please check your credentials.");
       }
     } catch (err: any) {
       console.error("Login API error:", err);

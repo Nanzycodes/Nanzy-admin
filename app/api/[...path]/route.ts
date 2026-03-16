@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://pearly-api-dev.qudra.io/api/v1";
 
 export async function GET(
   request: NextRequest,
@@ -79,16 +79,6 @@ async function handleProxy(
     });
 
     const responseText = await response.text();
-
-    // log any 4xx/5xx so we can see the backend's error message in terminal
-    if (!response.ok) {
-      console.error(`proxy error (${response.status})`, {
-        url: fullUrl,
-        method: request.method,
-        body,
-        response: responseText,
-      });
-    }
 
     return new NextResponse(responseText, {
       status: response.status,

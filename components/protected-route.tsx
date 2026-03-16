@@ -11,7 +11,8 @@ export default function ProtectedRoute({
   const router = useRouter();
 
   useEffect(() => {
-    const token = localStorage.getItem("accessToken");
+    // Keep this in sync with setAuthTokens/clearAuthTokens in lib/apiclient.ts
+    const token = localStorage.getItem("access_token");
 
     if (!token) {
       router.replace("/sign-in");

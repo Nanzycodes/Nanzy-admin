@@ -10,7 +10,14 @@ export interface AdminLoginRequest {
 }
 
 export interface AdminLoginResponse {
-  email: string; // Matches the API doc response
+  success: boolean;
+  message: string;
+  data: {
+    access?: string;
+    refresh?: string;
+    [key: string]: any;
+  };
+  errors?: any;
 }
 
 // Accept Invite
@@ -21,7 +28,13 @@ export interface AcceptInviteRequest {
 }
 
 export interface AcceptInviteResponse {
-  token: string;
+  success: boolean;
+  message: string;
+  data?: {
+    token?: string;
+    [key: string]: any;
+  };
+  errors?: any;
 }
 
 // Forgot Password (request a reset email)
@@ -30,7 +43,13 @@ export interface ForgotPasswordRequest {
 }
 
 export interface ForgotPasswordResponse {
-  email: string; // matches your API doc
+  success: boolean;
+  message: string;
+  data?: {
+    email?: string;
+    [key: string]: any;
+  };
+  errors?: any;
 }
 
 // Reset Password (set new password)
@@ -50,21 +69,24 @@ export interface ResetPasswordResponse {
 // Admin Auth API Functions
 // ============================================
 
-const ADMIN_BASE = "/api/v1/admin";
+const ADMIN_BASE = "admin";
 
 export const adminAuthApi = {
   // Admin Login
-  // ------------------------------
-  // Login
-  // ------------------------------
-  login: async (data: AdminLoginRequest): Promise<AdminLoginResponse> => {
-    const response = await apiClient.post<AdminLoginResponse>(
-      `${ADMIN_BASE}/login/`,
-      data
-    );
-    return response.data;
-  },
+  
+login: async (data: AdminLoginRequest): Promise<AdminLoginResponse> => {
+  const response = await apiClient.post<AdminLoginResponse>(
+    `${ADMIN_BASE}/login/`,
+    data
+  );
 
+  // if tokens are returned, store them (common pattern)
+  if (response.data?.data?.access) {
+    setAuthTokens(response.data.data.access, response.data.data.refresh);
+  }
+
+  return response.data;
+},
   // Accept Invite
   acceptInvite: async (
     data: AcceptInviteRequest

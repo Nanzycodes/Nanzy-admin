@@ -9,7 +9,7 @@ import { LockKeyhole } from "lucide-react";
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import adminAuthApi from "@/lib/auth";
-import z from "zod";
+import {z} from "zod";
 
 // Validation
 const inviteSchema = z
@@ -46,10 +46,10 @@ export default function InvitePage() {
         password_confirm: data.password_confirm,
       });
 
-      if (response.token) {
+      if (response.success) {
         router.push("/login?reset=true"); // Optional: redirect to login
       } else {
-        setError("Failed to accept invite. Please try again.");
+        setError(response.message || "Failed to accept invite. Please try again.");
       }
     } catch (err: any) {
       setError(err.response?.data?.message || "Something went wrong");

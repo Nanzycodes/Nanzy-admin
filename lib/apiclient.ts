@@ -1,7 +1,8 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 
-// Always use the Next.js API proxy to avoid CORS issues
-const API_BASE_URL = "/api/proxy";
+// Prefer using a proxy route to avoid CORS issues, but allow overriding via env.
+// If NEXT_PUBLIC_API_URL is set, we will call the remote API directly.
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 
 // Flag to prevent multiple refresh attempts
 let isRefreshing = false;
@@ -92,7 +93,7 @@ apiClient.interceptors.response.use(
         const response = await axios.post<{
           success: boolean;
           data: { access: string; refresh?: string };
-        }>(`${API_BASE_URL}/api/v1/admin/token/refresh/`, {
+        }>(`${API_BASE_URL}/admin/token/refresh/`, {
           refresh: refreshToken,
         });
 

@@ -15,6 +15,7 @@ export default function ForgotPasswordPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   const { control, handleSubmit } = useForm<FormValues>({
     defaultValues: { email: "" },
@@ -23,16 +24,19 @@ export default function ForgotPasswordPage() {
   const onSubmit = async (data: FormValues) => {
     setIsLoading(true);
     setError("");
+    setSuccess("");
 
     try {
       const response = await adminAuthApi.forgotPassword({ email: data.email });
       console.log("Forgot password response:", response);
 
-      if (response.email) {
-        // Navigate to "Check your inbox" page and pass email as query param
-        router.push(`/check-inbox?email=${encodeURIComponent(response.email)}`);
+      // Treat non-error (2xx) responses as successful, but still display a message if the API explicitly says it failed.
+      if (response.success === false) {
+        setError(response.message || JSON.stringify(response));
       } else {
-        setError("Failed to request password reset. Please try again.");
+        const email = response.data?.email || data.email;
+        setSuccess(`Password reset email sent to ${email}`);
+        // No redirect - show success message on the same page
       }
     } catch (err: any) {
       console.error("API error:", err);
@@ -53,12 +57,13 @@ export default function ForgotPasswordPage() {
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <InputWrapper type="email" name="email" placeholder="Email" control={control} />
 
-          <Button type="submit" disabled={isLoading}>
-            {isLoading ? "Submitting..." : "Submit"}
+          <Button type="submit" disabled={isLoading || !!success}>
+            {isLoading ? "Submitting..." : success ? "Email Sent" : "Submit"}
           </Button>
         </form>
 
         {error && <p className="text-red-500 mt-2">{error}</p>}
+        {success && <p className="text-green-500 mt-2">{success}</p>}
 
         <Link href="/sign-in" className="text-sm mt-4 block">
           Back to login

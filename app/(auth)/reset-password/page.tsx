@@ -66,6 +66,8 @@ export default function ResetPasswordPage() {
           Enter your new password
         </p>
 
+        {(!uid || !token) && <p className="text-red-500">⚠️ Invalid or missing reset link. Please check your email for the correct link.</p>}
+
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <InputWrapper
             type="password"
