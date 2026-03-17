@@ -120,7 +120,6 @@ jobs:
         run: echo "Image pushed with digest ${{ steps.meta.outputs.digest }}"
 
 
-
 notify:
     name: Notify Subscribers
     needs: build-and-push-image
