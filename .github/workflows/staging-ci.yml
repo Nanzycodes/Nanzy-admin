@@ -56,6 +56,9 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
+          build-args: |
+            NEXT_PUBLIC_BACKEND_URL=${{ secrets.STAGING_NEXT_PUBLIC_BACKEND_URL }}
+            NEXT_PUBLIC_API_URL=${{secrets.STAGING_NEXT_PUBLIC_API_URL}}
           push: false
           load: true
           tags: ${{ steps.meta.outputs.tags }}
