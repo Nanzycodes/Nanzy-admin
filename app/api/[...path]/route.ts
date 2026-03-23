@@ -1,46 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://pearly-api-dev.qudra.io/api/v1";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ path: string[] }> }
+  { params }: { params: Promise<{ path: string[] }> },
 ) {
   return handleProxy(request, await params);
 }
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ path: string[] }> }
+  { params }: { params: Promise<{ path: string[] }> },
 ) {
   return handleProxy(request, await params);
 }
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ path: string[] }> }
+  { params }: { params: Promise<{ path: string[] }> },
 ) {
   return handleProxy(request, await params);
 }
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ path: string[] }> }
+  { params }: { params: Promise<{ path: string[] }> },
 ) {
   return handleProxy(request, await params);
 }
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ path: string[] }> }
+  { params }: { params: Promise<{ path: string[] }> },
 ) {
   return handleProxy(request, await params);
 }
 
-async function handleProxy(
-  request: NextRequest,
-  params: { path: string[] }
-) {
+async function handleProxy(request: NextRequest, params: { path: string[] }) {
   try {
     // remove the literal "proxy" segment if the client included it
     const segments = [...params.path];
@@ -91,10 +88,9 @@ async function handleProxy(
     return NextResponse.json(
       {
         error: "Failed to proxy request",
-        details:
-          error instanceof Error ? error.message : "Unknown error",
+        details: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
