@@ -45,14 +45,25 @@ export default function ResetPasswordPage() {
 
       console.log("Reset password response:", response);
 
-      if (response.uid && response.token) {
+      if (response.success) {
         router.push("/sign-in"); // redirect to login
       } else {
         setError("Failed to reset password. Please try again.");
       }
     } catch (err: any) {
-      console.error("Reset password API error:", err);
-      setError(err.response?.data?.message || "Something went wrong");
+      const responseData = err.response?.data;
+      console.error("Reset password API error:", responseData || err);
+
+      const serverMessage = responseData?.message;
+      const serverErrors = responseData?.errors;
+      const serverDetails = responseData ? JSON.stringify(responseData) : undefined;
+
+      // Prioritize showing specific field errors if available
+      const errorText = serverErrors
+        ? JSON.stringify(serverErrors)
+        : serverMessage || serverDetails || "Something went wrong";
+
+      setError(errorText);
     } finally {
       setIsLoading(false);
     }
