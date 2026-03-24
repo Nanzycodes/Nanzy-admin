@@ -12,7 +12,6 @@ import apiClient from "@/lib/apiclient";
 const TABS: { label: string; role: UserRole | "all" }[] = [
   { label: "Users", role: "all" },
   { label: "Sellers", role: "seller" },
-  { label: "Delivery Partners", role: "delivery_partner" },
 ];
 
 export default function UsersPage() {
