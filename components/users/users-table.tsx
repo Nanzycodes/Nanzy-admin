@@ -1,16 +1,18 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Search, ListFilter, Calendar, ChevronDown } from "lucide-react";
-import { User, UserRole } from "@/types/user";
+import { Search, ListFilter, Calendar, ChevronDown, Loader2, X } from "lucide-react";
+import { User, UserRole, UserStatus } from "@/types/user";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import apiClient from "@/lib/apiclient";
 
 interface UsersTableProps {
   roleFilter: UserRole | "all";
@@ -19,29 +21,22 @@ interface UsersTableProps {
   onDelete: (user: User) => void;
 }
 
+const ITEMS_PER_PAGE = 7;
+
+const FILTER_STATUSES: { label: string; value: UserStatus }[] = [
+  { label: "Active", value: "active" },
+  { label: "Pending", value: "pending" },
+  { label: "Suspended", value: "suspended" },
+  { label: "Inactive", value: "inactive" },
+];
+
 const COLUMN_LABEL: Record<UserRole | "all", string> = {
   all: "User ID",
   user: "User ID",
-  seller: "Sellers ID",
+  seller: "Seller ID",
   delivery_partner: "Delivery Partner ID",
+  influencer: "Influencer ID",
 };
-
-const MOCK_USERS: User[] = [
-  { id: "PL-0001", name: "Olamade Lamina", email: "OlamadeLamina@gmail.com", date_joined: "01-04-2025", status: "active", role: "user" },
-  { id: "PL-0006", name: "Olamade Lamina", email: "OlamadeLamina@gmail.com", date_joined: "01-04-2025", status: "active", role: "seller" },
-  { id: "PL-0011", name: "Olamade Lamina", email: "OlamadeLamina@gmail.com", date_joined: "01-04-2025", status: "active", role: "delivery_partner" },
-];
-
-const ITEMS_PER_PAGE = 5;
-
-// ── Safe parser for dd-mm-yyyy → Date
-function parseUserDate(dateStr: string): Date | null {
-  const parts = dateStr.split("-");
-  if (parts.length !== 3) return null;
-  const [day, month, year] = parts;
-  const d = new Date(`${year}-${month}-${day}`);
-  return isNaN(d.getTime()) ? null : d;
-}
 
 export default function UsersTable({
   roleFilter,
@@ -51,62 +46,93 @@ export default function UsersTable({
 }: UsersTableProps) {
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [fromDate, setFromDate] = useState<Date | null>(null);
-  const [toDate, setToDate] = useState<Date | null>(null);
-  const [showFromPicker, setShowFromPicker] = useState(false);
-  const [showToPicker, setShowToPicker] = useState(false);
+  const [users, setUsers] = useState<User[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const fromPickerRef = useRef<HTMLDivElement>(null);
-  const toPickerRef = useRef<HTMLDivElement>(null);
+  const [filterStatus, setFilterStatus] = useState<UserStatus | null>(null);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const filterRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => setCurrentPage(1), [roleFilter]);
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
 
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (fromPickerRef.current && !fromPickerRef.current.contains(event.target as Node)) setShowFromPicker(false);
-      if (toPickerRef.current && !toPickerRef.current.contains(event.target as Node)) setShowToPicker(false);
+    setCurrentPage(1);
+  }, [roleFilter, search, filterStatus, dateFrom, dateTo]);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
+        setFilterOpen(false);
+      }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // ── Filter users
-  const filteredUsers = MOCK_USERS.filter((user) => {
-    const matchesRole = roleFilter === "all" || user.role === roleFilter;
-    const matchesSearch =
-      user.name.toLowerCase().includes(search.toLowerCase()) ||
-      user.email.toLowerCase().includes(search.toLowerCase());
+  useEffect(() => {
+    async function fetchUsers() {
+      setLoading(true);
+      setError(null);
+      try {
+        const params = new URLSearchParams();
+        params.append("page", String(currentPage));
+        params.append("page_size", String(ITEMS_PER_PAGE));
+        if (search) params.append("search", search);
+        if (filterStatus) params.append("status", filterStatus);
+        if (dateFrom) params.append("start_date", format(dateFrom, "yyyy-MM-dd"));
+        if (dateTo) params.append("end_date", format(dateTo, "yyyy-MM-dd"));
 
-    const userDate = parseUserDate(user.date_joined);
+        const response = await apiClient.get(`/admin/customers/?${params.toString()}`);
+        const data = response.data;
 
-    let matchesFrom = true;
-    let matchesTo = true;
-
-    if (userDate) {
-      if (fromDate instanceof Date) matchesFrom = userDate.getTime() >= fromDate.getTime();
-      if (toDate instanceof Date) matchesTo = userDate.getTime() <= toDate.getTime();
-    } else {
-      matchesFrom = false;
-      matchesTo = false;
+        if (data.data?.results) {
+          const mapped: User[] = data.data.results.map((u: any) => ({
+            ...u,
+            name: `${u.first_name} ${u.last_name}`.trim() || u.email,
+            role: u.role ?? "user",
+          }));
+          setUsers(mapped);
+          setTotalCount(data.data.count);
+        } else {
+          setUsers([]);
+          setTotalCount(0);
+        }
+      } catch {
+        setError("Failed to load users. Please try again.");
+      } finally {
+        setLoading(false);
+      }
     }
+    fetchUsers();
+  }, [currentPage, roleFilter, search, filterStatus, dateFrom, dateTo]);
 
-    return matchesRole && matchesSearch && matchesFrom && matchesTo;
-  });
-
-  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / ITEMS_PER_PAGE));
-  const paginatedUsers = filteredUsers.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE));
 
   function getPageNumbers(): (number | "...")[] {
-    if (totalPages <= 5) return Array.from({ length: totalPages }, (_, i) => i + 1);
-    return [1, 2, 3, "...", totalPages - 2, totalPages - 1, totalPages];
+    const pages: (number | "...")[] = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+      return pages;
+    }
+    pages.push(1);
+    if (currentPage > 3) pages.push("...");
+    const start = Math.max(2, currentPage - 1);
+    const end = Math.min(totalPages - 1, currentPage + 1);
+    for (let i = start; i <= end; i++) pages.push(i);
+    if (currentPage < totalPages - 2) pages.push("...");
+    pages.push(totalPages);
+    return pages;
   }
 
   return (
     <div>
-      {/* Toolbar */}
+      {/* ── Toolbar ── */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
         <div className="relative flex-1 max-w-[220px]">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
           <input
             placeholder="Search"
             value={search}
@@ -115,81 +141,130 @@ export default function UsersTable({
           />
         </div>
 
-        <button className="flex items-center gap-2 text-sm text-muted-foreground border border-border rounded-md px-3 h-9 hover:bg-muted transition-colors">
-          <ListFilter size={13} />
-          Filter
-        </button>
-
-        {/* Date From */}
-        <div ref={fromPickerRef} className="relative ml-auto">
-          <button onClick={() => setShowFromPicker(v => !v)} className="flex items-center gap-2 text-sm text-muted-foreground border border-border rounded-md px-3 h-9 hover:bg-muted transition-colors">
-            <Calendar size={13} /> Date from <ChevronDown size={13} />
+        <div className="relative" ref={filterRef}>
+          <button
+            onClick={() => setFilterOpen((prev) => !prev)}
+            className={`flex items-center gap-2 text-sm border rounded-md px-3 h-9 transition-colors
+              ${filterStatus ? "bg-primary text-primary-foreground border-primary" : "text-muted-foreground border-border hover:bg-muted"}`}
+          >
+            <ListFilter size={13} />
+            {filterStatus ? filterStatus.charAt(0).toUpperCase() + filterStatus.slice(1) : "Filter"}
+            {filterStatus ? (
+              <X size={12} onClick={(e) => { e.stopPropagation(); setFilterStatus(null); }} className="ml-1 hover:opacity-70" />
+            ) : (
+              <ChevronDown size={13} />
+            )}
           </button>
-          {showFromPicker && (
-            <div className="absolute z-50 mt-1">
-              <DatePicker
-                selected={fromDate}
-                onChange={(date:Date|null) => { setFromDate(date); setShowFromPicker(false); setCurrentPage(1); }}
-                maxDate={toDate || undefined}
-                inline
-              />
+          {filterOpen && (
+            <div className="absolute top-10 left-0 z-50 bg-white border border-border rounded-md shadow-md w-44 py-1">
+              {FILTER_STATUSES.map((f) => (
+                <button
+                  key={f.value}
+                  onClick={() => { setFilterStatus(f.value); setFilterOpen(false); }}
+                  className={`w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors
+                    ${filterStatus === f.value ? "text-primary font-medium" : "text-foreground"}`}
+                >
+                  {f.label}
+                </button>
+              ))}
             </div>
           )}
         </div>
 
-        {/* Date To */}
-        <div ref={toPickerRef} className="relative">
-          <button onClick={() => setShowToPicker(v => !v)} className="flex items-center gap-2 text-sm text-muted-foreground border border-border rounded-md px-3 h-9 hover:bg-muted transition-colors">
-            <Calendar size={13} /> Date to <ChevronDown size={13} />
-          </button>
-          {showToPicker && (
-            <div className="absolute z-50 mt-1">
-              <DatePicker
-                selected={toDate}
-                onChange={(date:Date|null) => { setToDate(date); setShowToPicker(false); setCurrentPage(1); }}
-                minDate={fromDate || undefined}
-                inline
-              />
-            </div>
-          )}
-        </div>
+        <Popover>
+          <PopoverTrigger asChild>
+            <button className={`ml-auto flex items-center gap-2 text-sm border rounded-md px-3 h-9 transition-colors
+              ${dateFrom ? "bg-primary text-primary-foreground border-primary" : "text-muted-foreground border-border hover:bg-muted"}`}>
+              <Calendar size={13} />
+              {dateFrom ? format(dateFrom, "dd/MM/yyyy") : "Date from"}
+              {dateFrom ? (
+                <X size={12} onClick={(e) => { e.stopPropagation(); setDateFrom(undefined); }} className="ml-1 hover:opacity-70" />
+              ) : (
+                <ChevronDown size={13} />
+              )}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <CalendarComponent mode="single" selected={dateFrom} onSelect={(date) => setDateFrom(date)} initialFocus />
+          </PopoverContent>
+        </Popover>
+
+        <Popover>
+          <PopoverTrigger asChild>
+            <button className={`flex items-center gap-2 text-sm border rounded-md px-3 h-9 transition-colors
+              ${dateTo ? "bg-primary text-primary-foreground border-primary" : "text-muted-foreground border-border hover:bg-muted"}`}>
+              <Calendar size={13} />
+              {dateTo ? format(dateTo, "dd/MM/yyyy") : "Date to"}
+              {dateTo ? (
+                <X size={12} onClick={(e) => { e.stopPropagation(); setDateTo(undefined); }} className="ml-1 hover:opacity-70" />
+              ) : (
+                <ChevronDown size={13} />
+              )}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <CalendarComponent mode="single" selected={dateTo} onSelect={(date) => setDateTo(date)} initialFocus />
+          </PopoverContent>
+        </Popover>
       </div>
 
-      {/* Table */}
+      {/* ── Table ── */}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border">
-              <th className="w-10 px-4 py-3 text-left"><input type="checkbox" className="rounded" /></th>
+              <th className="w-10 px-4 py-3 text-left">
+                <input type="checkbox" className="rounded" />
+              </th>
               <th className="text-left px-4 py-3 font-medium text-muted-foreground">{COLUMN_LABEL[roleFilter]}</th>
               <th className="text-left px-4 py-3 font-medium text-muted-foreground">Email address</th>
-              <th className="text-right px-4 py-3 font-medium text-muted-foreground">Date joined</th>
+              <th className="text-left px-4 py-3 font-medium text-muted-foreground">Date joined</th>
               <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
               <th className="text-left px-4 py-3 font-medium text-muted-foreground">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {paginatedUsers.length === 0 ? (
-              <tr><td colSpan={6} className="text-center py-12 text-muted-foreground">No users found</td></tr>
+            {loading ? (
+              <tr>
+                <td colSpan={6} className="text-center py-12 text-muted-foreground">
+                  <div className="flex items-center justify-center gap-2">
+                    <Loader2 size={16} className="animate-spin" />
+                    Loading users...
+                  </div>
+                </td>
+              </tr>
+            ) : error ? (
+              <tr>
+                <td colSpan={6} className="text-center py-12 text-red-500">{error}</td>
+              </tr>
+            ) : users.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="text-center py-12 text-muted-foreground">No users found</td>
+              </tr>
             ) : (
-              paginatedUsers.map(user => (
-                <tr key={user.id} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
-                  <td className="px-4 py-3"><input type="checkbox" className="rounded" /></td>
+              users.map((user) => (
+                <tr key={user.user_id} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
+                  <td className="px-4 py-3">
+                    <input type="checkbox" className="rounded" />
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <div className="flex shrink-0">
-                        <span className="w-2 h-2 rounded-full border border-muted-foreground/40" />
-                        <span className="w-2 h-2 rounded-full border border-muted-foreground/40 -ml-px" />
+                      <div className="w-8 h-8 rounded-full bg-primary/10 shrink-0 flex items-center justify-center text-xs font-medium text-primary">
+                        {user.name.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <p className="font-medium text-foreground">{user.name}</p>
-                        <p className="text-xs text-muted-foreground">#{user.id}</p>
+                        <p className="font-medium text-foreground leading-tight">{user.name}</p>
+                        <p className="text-xs text-muted-foreground leading-tight">#{user.user_id}</p>
                       </div>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">{user.email}</td>
-                  <td className="px-4 py-3 text-muted-foreground text-right">{user.date_joined}</td>
-                  <td className="px-4 py-3"><StatusBadge status={user.status} /></td>
+                  <td className="px-4 py-3 text-muted-foreground">
+                    {new Date(user.date_joined).toLocaleDateString("en-GB")}
+                  </td>
+                  <td className="px-4 py-3">
+                    <StatusBadge status={user.status} />
+                  </td>
                   <td className="px-4 py-3">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -202,7 +277,11 @@ export default function UsersTable({
                       <DropdownMenuContent align="end" className="w-40">
                         <DropdownMenuItem onClick={() => onViewDetails(user)}>View Details</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => onEdit(user)}>Edit</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => onDelete(user)} className="text-destructive focus:text-destructive">Delete</DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => onDelete(user)}
+                          className="text-destructive focus:text-destructive">
+                          Delete
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </td>
@@ -213,33 +292,38 @@ export default function UsersTable({
         </table>
       </div>
 
-      {/* Pagination */}
+      {/* ── Pagination ── */}
       <div className="flex items-center justify-between px-4 py-3 border-t border-border text-sm text-muted-foreground">
         <span>Page {currentPage} of {totalPages}</span>
         <div className="flex items-center gap-1">
           <button
-            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
             disabled={currentPage === 1}
-            className="flex items-center gap-1 px-3 py-1 rounded border border-border hover:bg-muted transition-colors disabled:opacity-40 text-sm"
+            className="flex items-center gap-1 px-3 py-1 rounded border border-border hover:bg-muted transition-colors disabled:opacity-40"
           >
             ← Previous
           </button>
-
           {getPageNumbers().map((page, i) =>
-            page === "..." ? <span key={`dots-${i}`} className="px-1 text-muted-foreground">...</span> :
-            <button
-              key={page}
-              onClick={() => setCurrentPage(page as number)}
-              className={`w-8 h-8 rounded text-sm font-medium transition-colors ${currentPage === page ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted border border-transparent hover:border-border"}`}
-            >
-              {page}
-            </button>
+            page === "..." ? (
+              <span key={`dots-${i}`} className="px-1">...</span>
+            ) : (
+              <button
+                key={page}
+                onClick={() => setCurrentPage(page as number)}
+                className={`w-8 h-8 rounded text-sm font-medium transition-colors
+                  ${currentPage === page
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-muted border border-transparent hover:border-border"
+                  }`}
+              >
+                {page}
+              </button>
+            )
           )}
-
           <button
-            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
             disabled={currentPage === totalPages}
-            className="flex items-center gap-1 px-3 py-1 rounded border border-border hover:bg-muted transition-colors disabled:opacity-40 text-sm"
+            className="flex items-center gap-1 px-3 py-1 rounded border border-border hover:bg-muted transition-colors disabled:opacity-40"
           >
             Next →
           </button>
@@ -249,15 +333,15 @@ export default function UsersTable({
   );
 }
 
-// ── Status badge ──
 function StatusBadge({ status }: { status: User["status"] }) {
-  const styles = {
+  const styles: Record<string, string> = {
     active: "bg-green-50 text-green-700 border-green-200",
     suspended: "bg-red-50 text-red-600 border-red-200",
     pending: "bg-yellow-50 text-yellow-700 border-yellow-200",
+    inactive: "bg-gray-50 text-gray-600 border-gray-200",
   };
   return (
-    <span className={`inline-flex items-center px-3 py-1 rounded-md text-xs font-medium border ${styles[status]}`}>
+    <span className={`inline-flex items-center px-3 py-1 rounded-md text-xs font-medium border ${styles[status] ?? styles.inactive}`}>
       {status.charAt(0).toUpperCase() + status.slice(1)}
     </span>
   );

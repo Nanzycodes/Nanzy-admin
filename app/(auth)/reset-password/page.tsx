@@ -46,7 +46,7 @@ export default function ResetPasswordPage() {
 
       console.log("Reset password response:", response);
 
-      if (response.uid && response.token) {
+      if (response.uid && response.token) {g
         router.push("/sign-in"); // redirect to login
       } else {
         setError("Failed to reset password. Please try again.");

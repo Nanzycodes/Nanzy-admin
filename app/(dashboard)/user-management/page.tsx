@@ -1,18 +1,14 @@
 "use client";
 
-// ─────────────────────────────────────────────
-// app/(dashboard)/users/page.tsx
-// ─────────────────────────────────────────────
-
-import { useState } from "react";
-// import { Plus } from "lucide-react"; // ❌ removed (no create)
+import { useState, useEffect } from "react";
 import UsersTable from "@/components/users/users-table";
-import UserFormModal from "@/components/users/user-form-modal"; // ✅ needed for edit
+import UserFormModal from "@/components/users/user-form-modal";
 import UserProfileModal from "@/components/users/user-profile-modal";
 import DeleteUserDialog from "@/components/users/delete-user-dialog";
 import { User, UserRole } from "@/types/user";
+import { TrendingUp } from "lucide-react";
+import apiClient from "@/lib/apiclient";
 
-// ❌ Influencer removed
 const TABS: { label: string; role: UserRole | "all" }[] = [
   { label: "Users", role: "all" },
   { label: "Sellers", role: "seller" },
@@ -20,35 +16,38 @@ const TABS: { label: string; role: UserRole | "all" }[] = [
 ];
 
 export default function UsersPage() {
-  // Active tab
   const [activeTab, setActiveTab] = useState<UserRole | "all">("all");
-
-  // ❌ Create modal removed
-  // const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-
-  // ✅ Edit modal
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
-  // ── Actions ──
-  const handleViewDetails = (user: User) => {
-    setSelectedUser(user);
-    setIsProfileModalOpen(true);
-  };
+  // ── Stat counts ──
+  const [totalUsers, setTotalUsers] = useState(0);
+  const [activeUsers, setActiveUsers] = useState(0);
+  const [pendingUsers, setPendingUsers] = useState(0);
 
-  const handleEdit = (user: User) => {
-    setSelectedUser(user);
-    setIsEditModalOpen(true);
-  };
+  useEffect(() => {
+    async function fetchCounts() {
+      try {
+        const [totalRes, activeRes, pendingRes] = await Promise.all([
+          apiClient.get(`/admin/customers/?page_size=1`),
+          apiClient.get(`/admin/customers/?page_size=1&status=active`),
+          apiClient.get(`/admin/customers/?page_size=1&status=pending`),
+        ]);
+        setTotalUsers(totalRes.data?.data?.count ?? 0);
+setActiveUsers(activeRes.data?.data?.count ?? 0);
+setPendingUsers(pendingRes.data?.data?.count ?? 0);   
+   } catch {
+        // silently fail
+      }
+    }
+    fetchCounts();
+  }, []);
 
-  const handleDelete = (user: User) => {
-    setSelectedUser(user);
-    setIsDeleteDialogOpen(true);
-  };
+  const handleViewDetails = (user: User) => { setSelectedUser(user); setIsProfileModalOpen(true); };
+  const handleEdit = (user: User) => { setSelectedUser(user); setIsEditModalOpen(true); };
+  const handleDelete = (user: User) => { setSelectedUser(user); setIsDeleteDialogOpen(true); };
 
   return (
     <div>
@@ -58,13 +57,6 @@ export default function UsersPage() {
           <h1 className="text-2xl font-bold text-foreground">Users</h1>
           <p className="text-sm text-muted-foreground">Manage users</p>
         </div>
-
-        {/* ❌ Create button removed */}
-        {/*
-        <Button onClick={() => setIsCreateModalOpen(true)}>
-          Create User
-        </Button>
-        */}
       </div>
 
       {/* ── Tabs ── */}
@@ -74,10 +66,9 @@ export default function UsersPage() {
             key={tab.role}
             onClick={() => setActiveTab(tab.role)}
             className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px
-              ${
-                activeTab === tab.role
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
+              ${activeTab === tab.role
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
           >
             {tab.label}
@@ -85,13 +76,22 @@ export default function UsersPage() {
         ))}
       </div>
 
+      {/* ── Stat cards ── */}
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <StatCard label="Total Users" value={totalUsers} trend="3,982 since last month" />
+        <StatCard label="Active Users" value={activeUsers} trend="382 since last week" />
+        <StatCard label="Pending Users" value={pendingUsers} trend="82 since last week" />
+      </div>
+
       {/* ── Users Table ── */}
-      <UsersTable
-        roleFilter={activeTab}
-        onViewDetails={handleViewDetails}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-      />
+      <div className="bg-white rounded-xl border border-border">
+        <UsersTable
+          roleFilter={activeTab}
+          onViewDetails={handleViewDetails}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+        />
+      </div>
 
       {/* ── Edit User Modal ── */}
       {selectedUser && isEditModalOpen && (
@@ -99,10 +99,7 @@ export default function UsersPage() {
           mode="edit"
           user={selectedUser}
           isOpen={isEditModalOpen}
-          onClose={() => {
-            setIsEditModalOpen(false);
-            setSelectedUser(null);
-          }}
+          onClose={() => { setIsEditModalOpen(false); setSelectedUser(null); }}
         />
       )}
 
@@ -111,14 +108,8 @@ export default function UsersPage() {
         <UserProfileModal
           user={selectedUser}
           isOpen={isProfileModalOpen}
-          onClose={() => {
-            setIsProfileModalOpen(false);
-            setSelectedUser(null);
-          }}
-          onEdit={() => {
-            setIsProfileModalOpen(false);
-            setIsEditModalOpen(true);
-          }}
+          onClose={() => { setIsProfileModalOpen(false); setSelectedUser(null); }}
+          onEdit={() => { setIsProfileModalOpen(false); setIsEditModalOpen(true); }}
         />
       )}
 
@@ -127,12 +118,32 @@ export default function UsersPage() {
         <DeleteUserDialog
           user={selectedUser}
           isOpen={isDeleteDialogOpen}
-          onClose={() => {
-            setIsDeleteDialogOpen(false);
-            setSelectedUser(null);
-          }}
+          onDeleted={() => window.location.reload()}
+          onClose={() => { setIsDeleteDialogOpen(false); setSelectedUser(null); }}
         />
       )}
+    </div>
+  );
+}
+
+// ── Stat card component ──
+function StatCard({ label, value, trend }: {
+  label: string;
+  value: number;
+  trend: string;
+}) {
+  return (
+    <div className="bg-white rounded-xl border border-border p-5">
+      <p className="text-sm font-medium text-foreground mb-2">{label}</p>
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-xs text-muted-foreground">{trend}</span>
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+          <path d="M5 1L9.33013 8.5H0.669873L5 1Z" fill="#22C55E" />
+        </svg>
+      </div>
+      <p className="text-3xl font-bold text-foreground">
+        {value.toLocaleString()}
+      </p>
     </div>
   );
 }
