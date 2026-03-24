@@ -1,4 +1,3 @@
-
 "use client";
 
 import AuthLayout, { InnerContainer } from "@/components/auth-layout";
@@ -46,11 +45,11 @@ export default function ResetPasswordPage() {
 
       console.log("Reset password response:", response);
 
-      if (response.uid && response.token) {
-        router.push("/sign-in"); // redirect to login
-      } else {
-        setError("Failed to reset password. Please try again.");
-      }
+      // if (response.uid && response.token) {
+      //   router.push("/sign-in"); // redirect to login
+      // } else {
+      //   setError("Failed to reset password. Please try again.");
+      // }
     } catch (err: any) {
       console.error("Reset password API error:", err);
       setError(err.response?.data?.message || "Something went wrong");
@@ -63,11 +62,14 @@ export default function ResetPasswordPage() {
     <AuthLayout>
       <InnerContainer>
         <h1 className="font-mono text-[32px] font-bold mb-2">Reset Password</h1>
-        <p className="text-sm text-[#616161] mb-4">
-          Enter your new password
-        </p>
+        <p className="text-sm text-[#616161] mb-4">Enter your new password</p>
 
-        {(!uid || !token) && <p className="text-red-500">⚠️ Invalid or missing reset link. Please check your email for the correct link.</p>}
+        {(!uid || !token) && (
+          <p className="text-red-500">
+            ⚠️ Invalid or missing reset link. Please check your email for the
+            correct link.
+          </p>
+        )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <InputWrapper
