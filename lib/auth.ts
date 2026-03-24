@@ -61,8 +61,12 @@ export interface ResetPasswordRequest {
 }
 
 export interface ResetPasswordResponse {
-  uid: string;
-  token: string;
+  //d: string;
+ //oken: string;
+ success: boolean;
+  message: string;
+  data?:any;
+  errors?: any;
 }
 
 // ============================================

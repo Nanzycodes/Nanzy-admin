@@ -60,4 +60,4 @@ EXPOSE 3000
 
 ENV PORT=3000
 
-CMD ["node", "server.js", "--hostname", "0.0.0.0"]
+CMD ["node", "--hostname", "0.0.0.0"]

@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import AuthLayout, { InnerContainer } from "@/components/auth-layout";
 import ResetPasswordClient from "@/components/reset-password";
 
