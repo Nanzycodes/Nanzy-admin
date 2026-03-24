@@ -43,11 +43,13 @@ export default function ResetPasswordClient({ uid, token }: Props) {
         new_password_confirm: data.new_password_confirm,
       });
 
-      if (response.uid && response.token) {
-        router.push("/sign-in");
-      } else {
-        setError("Failed to reset password.");
-      }
+      console.log("Reset password response:", response);
+
+      // if (response.uid && response.token) {
+      //   router.push("/sign-in");
+      // } else {
+      //   setError("Failed to reset password.");
+      // }
     } catch (err: any) {
       setError(err.response?.data?.message || "Something went wrong");
     } finally {
