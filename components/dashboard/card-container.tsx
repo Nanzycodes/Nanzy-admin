@@ -10,10 +10,12 @@ function DashboardCardContainer({
   cardTitle,
   titleIcon,
   children,
+  className = "",
 }: {
   cardTitle: string;
   titleIcon: string;
   children: React.ReactNode;
+  className?: string;
 }) {
   const [selectedPeriod, setSelectedPeriod] = useState(periodOptions[1]);
 
@@ -22,25 +24,23 @@ function DashboardCardContainer({
   };
 
   return (
-    <div className="px-4 py-3 bg-[#FFFFFF66] border border-[#fffefb] rounded-[5px]">
-      <div className="flex justify-between items-center mb-4">
+    <div className={`px-4 py-3 bg-[#FFFFFF66] border border-[#fffefb] rounded-[5px] h-full flex flex-col ${className}`}>
+      <div className="flex justify-between items-center mb-4 shrink-0">
         <div className="flex gap-x-2 items-center">
-          <Image src={titleIcon} alt="icons" />
-          <p>{cardTitle}</p>
+          <Image src={titleIcon} alt="icons" width={20} height={20} />
+          <p className="font-medium text-[#1A1A1A]">{cardTitle}</p>
         </div>
-
-        <div className="flex items-center">
+        <div className="flex items-center gap-2">
           <CustomDropdown
             icon={CalendarRange}
             value={selectedPeriod.value}
             options={periodOptions}
             onChange={handlePeriodChange}
           />
-          <Image src={BoxDiagonalArrow} alt="icons" />
+          <Image src={BoxDiagonalArrow} alt="icons" className="cursor-pointer" />
         </div>
       </div>
-
-      <div>{children}</div>
+      <div className="flex-1">{children}</div>
     </div>
   );
 }

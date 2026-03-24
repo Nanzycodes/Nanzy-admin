@@ -1,4 +1,4 @@
-export type UserRole = "user" | "seller" | "delivery_partner" | "influencer";
+export type UserRole = "user" | "seller" | "influencer";
 export type UserStatus = "active" | "suspended" | "pending" | "inactive";
 
 // Shape returned by GET /api/v1/admin/customers/

@@ -30,7 +30,6 @@ export default function UserProfileModal({
   const roleLabel: Record<User["role"], string> = {
     user: "General User",
     seller: "Seller",
-    delivery_partner: "Delivery Partner",
     influencer: "Influencer",
   };
 

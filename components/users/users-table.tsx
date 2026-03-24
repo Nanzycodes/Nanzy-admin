@@ -34,7 +34,6 @@ const COLUMN_LABEL: Record<UserRole | "all", string> = {
   all: "User ID",
   user: "User ID",
   seller: "Seller ID",
-  delivery_partner: "Delivery Partner ID",
   influencer: "Influencer ID",
 };
 
@@ -85,14 +84,19 @@ export default function UsersTable({
         if (dateFrom) params.append("start_date", format(dateFrom, "yyyy-MM-dd"));
         if (dateTo) params.append("end_date", format(dateTo, "yyyy-MM-dd"));
 
-        const response = await apiClient.get(`/admin/customers/?${params.toString()}`);
+        let url = "/admin/customers/?";
+        if (roleFilter === "seller") {
+          url = "/admin/sellers/?";
+        }
+
+        const response = await apiClient.get(`${url}${params.toString()}`);
         const data = response.data;
 
         if (data.data?.results) {
           const mapped: User[] = data.data.results.map((u: any) => ({
             ...u,
             name: `${u.first_name} ${u.last_name}`.trim() || u.email,
-            role: u.role ?? "user",
+            role: roleFilter === "seller" ? "seller" : u.role ?? "user",
           }));
           setUsers(mapped);
           setTotalCount(data.data.count);
@@ -260,7 +264,13 @@ export default function UsersTable({
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">{user.email}</td>
                   <td className="px-4 py-3 text-muted-foreground">
-                    {new Date(user.date_joined).toLocaleDateString("en-GB")}
+                    {(() => {
+                      const d = new Date(user.date_joined);
+                      const day = String(d.getDate()).padStart(2, '0');
+                      const month = String(d.getMonth() + 1).padStart(2, '0');
+                      const year = d.getFullYear();
+                      return `${day}-${month}-${year}`;
+                    })()}
                   </td>
                   <td className="px-4 py-3">
                     <StatusBadge status={user.status} />
@@ -268,20 +278,14 @@ export default function UsersTable({
                   <td className="px-4 py-3">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <button className="flex items-center hover:opacity-70 transition-opacity">
+                        <button className="flex items-center space-x-1 hover:opacity-70 transition-opacity">
                           <span className="w-2 h-2 rounded-full border border-muted-foreground/40" />
-                          <span className="w-2 h-2 rounded-full border border-muted-foreground/40 -ml-px" />
-                          <span className="w-2 h-2 rounded-full border border-muted-foreground/40 -ml-px" />
+                          <span className="w-2 h-2 rounded-full border border-muted-foreground/40" />
+                          <span className="w-2 h-2 rounded-full border border-muted-foreground/40" />
                         </button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-40">
                         <DropdownMenuItem onClick={() => onViewDetails(user)}>View Details</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => onEdit(user)}>Edit</DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => onDelete(user)}
-                          className="text-destructive focus:text-destructive">
-                          Delete
-                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </td>

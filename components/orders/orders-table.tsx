@@ -100,9 +100,9 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
         const response = await apiClient.get(`/admin/orders/?${params.toString()}`);
         const data = response.data;
 
-        if (data.results) {
-          setOrders(data.results);
-          setTotalCount(data.count);
+        if (data.data?.results) {
+          setOrders(data.data.results);
+          setTotalCount(data.data.count);
         } else if (Array.isArray(data)) {
           setOrders(data);
           setTotalCount(data.length);
@@ -324,8 +324,8 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
                   <input type="checkbox" className="rounded" />
                 </th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground">Customer / Order ID</th>
+                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Product</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground">Item Quantity</th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Total Amount</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground">Date</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground">Actions</th>
@@ -366,12 +366,16 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
                         </div>
                       </div>
                     </td>
+                    <td className="px-4 py-3 text-muted-foreground">{order.items_count} item{order.items_count === '1' ? '' : 's'}</td>
                     <td className="px-4 py-3 text-muted-foreground">{order.items_count}</td>
-                    <td className="px-4 py-3 text-foreground font-medium">
-                      ₦{Number(order.total_amount).toLocaleString()}
-                    </td>
                     <td className="px-4 py-3 text-muted-foreground">
-                      {new Date(order.created_at).toLocaleDateString("en-GB")}
+                      {(() => {
+                        const d = new Date(order.created_at);
+                        const day = String(d.getDate()).padStart(2, '0');
+                        const month = String(d.getMonth() + 1).padStart(2, '0');
+                        const year = d.getFullYear();
+                        return `${day}-${month}-${year}`;
+                      })()}
                     </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={order.status} />
@@ -388,22 +392,6 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
                         <DropdownMenuContent align="end" className="w-48">
                           <DropdownMenuItem onClick={() => handleViewDetails(order)}>
                             View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleStatusUpdate(order.id, "IN_TRANSIT")}>
-                            Mark as In-transit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleStatusUpdate(order.id, "DELIVERED")}>
-                            Mark as Delivered
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleStatusUpdate(order.id, "REJECTED")}
-                            className="text-destructive focus:text-destructive">
-                            Mark as Rejected
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleDeleteOrder(order.id)}
-                            className="text-destructive focus:text-destructive">
-                            Cancel Order
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
