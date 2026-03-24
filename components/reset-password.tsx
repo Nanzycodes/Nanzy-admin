@@ -43,6 +43,8 @@ export default function ResetPasswordClient({ uid, token }: Props) {
         new_password_confirm: data.new_password_confirm,
       });
 
+      console.log("Reset password response:", response);
+
       // if (response.uid && response.token) {
       //   router.push("/sign-in");
       // } else {

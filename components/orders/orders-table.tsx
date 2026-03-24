@@ -1,7 +1,5 @@
 "use client";
 
-// components/orders/orders-table.tsx
-
 import React, { useState, useEffect, useRef } from "react";
 import { Search, ListFilter, Calendar, ChevronDown, TrendingUp, X, Loader2 } from "lucide-react";
 import { Order, OrderStatus, OrderDetail, STATUS_LABELS } from "@/types/order";
@@ -20,14 +18,12 @@ interface OrdersTableProps {
   onViewDetails: (order: OrderDetail) => void;
 }
 
-// ── Tabs ──
 const TABS: { label: string; value: OrderStatus | "all" }[] = [
   { label: "All orders", value: "all" },
   { label: "Orders delivered", value: "DELIVERED" },
   { label: "Orders in transit", value: "IN_TRANSIT" },
 ];
 
-// ── Filter status options ──
 const FILTER_STATUSES: { label: string; value: OrderStatus }[] = [
   { label: "Pending", value: "PENDING" },
   { label: "In-transit", value: "IN_TRANSIT" },
@@ -47,16 +43,16 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // ── Filter state ──
+  const [transitCount, setTransitCount] = useState(0);
+  const [deliveredCount, setDeliveredCount] = useState(0);
+
   const [filterStatus, setFilterStatus] = useState<OrderStatus | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
 
-  // ── Date state ──
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
 
-  // ── Close filter dropdown when clicking outside ──
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
@@ -67,17 +63,30 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // ── Reset page when filters change ──
   useEffect(() => {
     setCurrentPage(1);
   }, [activeTab, search, filterStatus, dateFrom, dateTo]);
 
-  // ── Fetch orders from API ──
+  useEffect(() => {
+    async function fetchCounts() {
+      try {
+        const [transitRes, deliveredRes] = await Promise.all([
+          apiClient.get(`/admin/orders/?status=IN_TRANSIT&page_size=1`),
+          apiClient.get(`/admin/orders/?status=DELIVERED&page_size=1`),
+        ]);
+        setTransitCount(transitRes.data?.count ?? 0);
+        setDeliveredCount(deliveredRes.data?.count ?? 0);
+      } catch {
+        // silently fail
+      }
+    }
+    fetchCounts();
+  }, []);
+
   useEffect(() => {
     async function fetchOrders() {
       setLoading(true);
       setError(null);
-
       try {
         const params = new URLSearchParams();
         params.append("page", String(currentPage));
@@ -88,68 +97,55 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
         if (dateFrom) params.append("created_after", format(dateFrom, "yyyy-MM-dd"));
         if (dateTo) params.append("created_before", format(dateTo, "yyyy-MM-dd"));
 
-        const response = await apiClient.get(
-  `/admin/orders/?${params.toString()}`
-);
+        const response = await apiClient.get(`/admin/orders/?${params.toString()}`);
+        const data = response.data;
 
-// Handle both paginated and non-paginated responses
-const data = response.data;
-if (data.results) {
-  // Paginated response: { count, results: [...] }
-  setOrders(data.results);
-  setTotalCount(data.count);
-} else if (Array.isArray(data)) {
-  // Direct array response: [...]
-  setOrders(data);
-  setTotalCount(data.length);
-} else {
-  setOrders([]);
-  setTotalCount(0);
-}} catch (err) {
+        if (data.results) {
+          setOrders(data.results);
+          setTotalCount(data.count);
+        } else if (Array.isArray(data)) {
+          setOrders(data);
+          setTotalCount(data.length);
+        } else {
+          setOrders([]);
+          setTotalCount(0);
+        }
+      } catch {
         setError("Failed to load orders. Please try again.");
       } finally {
         setLoading(false);
       }
     }
-
     fetchOrders();
   }, [currentPage, activeTab, search, filterStatus, dateFrom, dateTo]);
 
-  // ── Fetch single order detail and open modal ──
   async function handleViewDetails(order: Order) {
     try {
-      const response = await apiClient.get(
-        `/admin/orders/${order.id}/`
-      );
+      const response = await apiClient.get(`/admin/orders/${order.id}/`);
       onViewDetails(response.data);
-    } catch (err) {
+    } catch {
       alert("Could not load order details. Please try again.");
     }
   }
 
-  // ── Update order status ──
   async function handleStatusUpdate(orderId: string, newStatus: OrderStatus) {
     try {
-      await apiClient.patch(
-        `/admin/orders/${orderId}/`,
-        { status: newStatus }
-      );
+      await apiClient.patch(`/admin/orders/${orderId}/`, { status: newStatus });
       setOrders((prev) =>
         prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
       );
-    } catch (err) {
+    } catch {
       alert("Could not update order status. Please try again.");
     }
   }
 
-  // ── Delete order ──
   async function handleDeleteOrder(orderId: string) {
     if (!confirm("Are you sure you want to cancel this order?")) return;
     try {
       await apiClient.delete(`/admin/orders/${orderId}/delete/`);
       setOrders((prev) => prev.filter((o) => o.id !== orderId));
       setTotalCount((prev) => prev - 1);
-    } catch (err) {
+    } catch {
       alert("Could not cancel order. Please try again.");
     }
   }
@@ -199,7 +195,7 @@ if (data.results) {
             </div>
           }
           label="Orders in transit"
-          value={String((orders ?? []).filter((o) => o.status === "IN_TRANSIT").length)}
+          value={String(transitCount)}
           trend="4%"
         />
         <StatCard
@@ -213,7 +209,7 @@ if (data.results) {
             </div>
           }
           label="Orders delivered"
-          value={String((orders ?? []).filter((o) => o.status === "DELIVERED").length)}
+          value={String(deliveredCount)}
           trend="5%"
         />
       </div>
@@ -239,18 +235,17 @@ if (data.results) {
       <div className="bg-white rounded-xl border border-border">
         {/* ── Toolbar ── */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
-          {/* Search */}
           <div className="relative flex-1 max-w-[220px]">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none z-10" />
             <input
               placeholder="Search"
               value={search}
               onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
-              className="w-full pl-8 pr-3 h-9 text-sm border border-border rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring relative z-0"
+              className="w-full pl-8 pr-3 h-9 text-sm border border-border rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
             />
           </div>
 
-          {/* Filter dropdown */}
+          {/* Filter */}
           <div className="relative" ref={filterRef}>
             <button
               onClick={() => setFilterOpen((prev) => !prev)}
@@ -328,9 +323,8 @@ if (data.results) {
                 <th className="w-10 px-4 py-3 text-left">
                   <input type="checkbox" className="rounded" />
                 </th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Customer</th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Email</th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Items</th>
+                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Customer / Order ID</th>
+                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Item Quantity</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground">Total Amount</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground">Date</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
@@ -340,7 +334,7 @@ if (data.results) {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-12 text-muted-foreground">
+                  <td colSpan={7} className="text-center py-12 text-muted-foreground">
                     <div className="flex items-center justify-center gap-2">
                       <Loader2 size={16} className="animate-spin" />
                       Loading orders...
@@ -349,15 +343,11 @@ if (data.results) {
                 </tr>
               ) : error ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-12 text-red-500">
-                    {error}
-                  </td>
+                  <td colSpan={7} className="text-center py-12 text-red-500">{error}</td>
                 </tr>
               ) : orders.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-12 text-muted-foreground">
-                    No orders found
-                  </td>
+                  <td colSpan={7} className="text-center py-12 text-muted-foreground">No orders found</td>
                 </tr>
               ) : (
                 orders.map((order) => (
@@ -370,12 +360,16 @@ if (data.results) {
                         <div className="w-8 h-8 rounded-full bg-muted-foreground/20 shrink-0 flex items-center justify-center text-xs font-medium text-muted-foreground">
                           {order.customer?.charAt(0) ?? "?"}
                         </div>
-                        <p className="font-medium text-foreground">{order.customer}</p>
+                        <div>
+                          <p className="font-medium text-foreground leading-tight">{order.customer}</p>
+                          <p className="text-xs text-muted-foreground leading-tight">#{order.id}</p>
+                        </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground">{order.customer_email}</td>
                     <td className="px-4 py-3 text-muted-foreground">{order.items_count}</td>
-                    <td className="px-4 py-3 text-foreground">₦{Number(order.total_amount).toLocaleString()}</td>
+                    <td className="px-4 py-3 text-foreground font-medium">
+                      ₦{Number(order.total_amount).toLocaleString()}
+                    </td>
                     <td className="px-4 py-3 text-muted-foreground">
                       {new Date(order.created_at).toLocaleDateString("en-GB")}
                     </td>
@@ -463,7 +457,6 @@ if (data.results) {
   );
 }
 
-// ── Stat card ──
 function StatCard({ icon, label, value, trend }: { icon: React.ReactNode; label: string; value: string; trend: string }) {
   return (
     <div className="bg-white rounded-xl border border-border p-4">
@@ -485,7 +478,6 @@ function StatCard({ icon, label, value, trend }: { icon: React.ReactNode; label:
   );
 }
 
-// ── Status badge ──
 function StatusBadge({ status }: { status: OrderStatus }) {
   const styles: Record<OrderStatus, string> = {
     IN_TRANSIT: "bg-green-50 text-green-700 border-green-200",
