@@ -1,4 +1,4 @@
-export type UserRole = "user" | "seller" | "delivery_partner";
+export type UserRole = "user" | "seller" | "delivery_partner" | "influencer";
 export type UserStatus = "active" | "suspended" | "pending";
 
 export interface User {
