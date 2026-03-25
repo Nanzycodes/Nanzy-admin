@@ -25,3 +25,14 @@ export interface PaginatedUsers {
   previous: string | null;
   results: User[];
 }
+
+export interface AdminEntry {
+  id: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  roles: string;
+  status: "active" | "pending" | "suspended" | "inactive";
+  is_active: boolean;
+  date_joined: string; // ISO datetime from API
+}

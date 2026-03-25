@@ -33,13 +33,17 @@ export function NavUser({ user }: { user: any }) {
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               {/* <Avatar className="h-8 w-8 rounded-[2px]">
-                <AvatarFallback className="rounded-[2px] bg-[#0088FF] text-white">
-                  {getNameInitials(user?.full_name)}
+                <AvatarFallback className="rounded-[2px] bg-[#0088FF] text-white text-xs">
+                  {user?.first_name?.[0]}
+                  {user?.last_name?.[0]}
                 </AvatarFallback>
               </Avatar> */}
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium capitalize">
-                  {user?.full_name}
+                <span className="truncate font-medium capitalize text-black">
+                  {user?.first_name} {user?.last_name} 
+                </span>
+                <span className="truncate text-xs text-[#9E9E9E]">
+                  {user?.email}
                 </span>
               </div>
               <ChevronRight className="ml-auto size-4" />
@@ -54,6 +58,9 @@ export function NavUser({ user }: { user: any }) {
             <DropdownMenuLabel className="p-0 font-normal">
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm mb-1">
                 <div className="grid flex-1 text-left text-sm leading-tight">
+                  <span className="truncate font-medium capitalize text-black">
+                    {user?.first_name} {user?.last_name} 
+                  </span>
                   <span className="truncate text-sm text-[#657E95]">
                     {user?.email}
                   </span>
