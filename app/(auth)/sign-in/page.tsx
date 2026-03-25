@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { LockKeyhole, Mail } from "lucide-react";
+import { LockKeyhole, Mail, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import adminAuthApi from "@/lib/auth"; // Admin Auth API
@@ -19,6 +19,7 @@ export default function LoginPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const { control, handleSubmit } = useForm<FormValues>({
     resolver: zodResolver(loginSchema),
@@ -80,11 +81,16 @@ console.log("Login response:", response);
           />
 
           <InputWrapper
-            type="password"
+            type={showPassword ? "text" : "password"}
             name="password"
             placeholder="Enter your password here"
             control={control}
             startIcon={<LockKeyhole size={16} className="text-primary" />}
+            endIcon={
+              <button type="button" onClick={() => setShowPassword((p) => !p)}>
+                {showPassword ? <EyeOff size={16} className="text-[#9E9E9E]" /> : <Eye size={16} className="text-[#9E9E9E]" />}
+              </button>
+            }
           />
 
           <Button

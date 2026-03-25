@@ -16,7 +16,7 @@ type Props = {
   placeholder?: string;
   // btnType?: "button" | "submit";
   startIcon?: string | React.ReactNode;
-  endIcon?: string;
+  endIcon?: React.ReactNode;
   disabled?: boolean;
   // onclick?: () => void;
   // children?: React.ReactNode;
