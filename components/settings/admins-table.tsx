@@ -113,22 +113,27 @@ export default function AdminsTable() {
             {admin.first_name} {admin.last_name}
           </p>
           <p className="text-xs text-muted-foreground">#{admin.id.slice(0, 8)}</p>
+          <p className="text-xs text-muted-foreground sm:hidden">{admin.email}</p>
+          <p className="text-xs text-muted-foreground md:hidden sm:block hidden">{admin.roles}</p>
         </div>
       ),
     },
     {
       key: "email",
       header: "Email",
+      className: "hidden sm:table-cell",
       cell: (admin) => <span className="text-muted-foreground">{admin.email}</span>,
     },
     {
       key: "roles",
       header: "Role",
+      className: "hidden md:table-cell",
       cell: (admin) => <span className="text-muted-foreground">{admin.roles}</span>,
     },
     {
       key: "date_joined",
       header: "Date joined",
+      className: "hidden lg:table-cell",
       cell: (admin) => (
         <span className="text-muted-foreground">{formatDate(admin.date_joined)}</span>
       ),
