@@ -48,15 +48,20 @@ function DonutChart({ customersPercent, sellersPercent }: { customersPercent: nu
   const cy = 110;
 
   function getArc(startPercent: number, endPercent: number, color: string) {
+    if (endPercent - startPercent <= 0) return null;
+    
+    const safeEnd = endPercent >= 100 ? 99.99 : endPercent;
+    
     const startAngle = (startPercent / 100) * 360 - 90;
-    const endAngle = (endPercent / 100) * 360 - 90;
+    const endAngle = (safeEnd / 100) * 360 - 90;
     const startRad = (startAngle * Math.PI) / 180;
     const endRad = (endAngle * Math.PI) / 180;
     const x1 = cx + radius * Math.cos(startRad);
     const y1 = cy + radius * Math.sin(startRad);
     const x2 = cx + radius * Math.cos(endRad);
     const y2 = cy + radius * Math.sin(endRad);
-    const largeArc = endPercent - startPercent > 50 ? 1 : 0;
+    const largeArc = safeEnd - startPercent > 50 ? 1 : 0;
+    
     return (
       <path
         d={`M ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2}`}
@@ -98,22 +103,23 @@ export default function AnalyticsDashboard() {
     }).finally(() => setLoading(false));
   }, []);
 
-  // ── Extract data from analytics API ──
   const totalUsers = analytics?.users?.total ?? 0;
   const usersWeeklyChange = analytics?.users?.weekly_change ?? 0;
   const usersChart = analytics?.users?.chart ?? [];
   const totalUploads = analytics?.uploads?.total ?? 0;
   const uploadsWeeklyChange = analytics?.uploads?.weekly_change ?? 0;
   const uploadsChart = analytics?.uploads?.chart ?? [];
+  
   const totalUsersCount = analytics?.user_distribution?.total_users ?? 0;
-  const customersPercent = analytics?.user_distribution?.customers?.percentage ?? 0;
-  const sellersPercent = analytics?.user_distribution?.sellers?.percentage ?? 0;
   const customersCount = analytics?.user_distribution?.customers?.count ?? 0;
   const sellersCount = analytics?.user_distribution?.sellers?.count ?? 0;
 
-  // ── Extract data from metrics API ──
-  const newUsers = metrics?.total_customers?.new_since_last_month ?? 0;
+  // ── THE FIX: Force the chart total to be the exact sum of the two groups ──
+  const chartTotal = customersCount + sellersCount > 0 ? customersCount + sellersCount : 1;
+  const customersPercent = (customersCount / chartTotal) * 100;
+  const sellersPercent = (sellersCount / chartTotal) * 100;
 
+  const newUsers = metrics?.total_customers?.new_since_last_month ?? 0;
   const isUp = (val: number) => val >= 0;
 
   return (
@@ -244,67 +250,67 @@ export default function AnalyticsDashboard() {
                 <p className="text-sm text-muted-foreground py-4 text-center">No content found</p>
               ) : (
                 topContent.map((item: any, i: number) => {
-  const isVideo = item.content_type === "video";
-  const isArticle = item.content_type === "article";
-  const isLivestream = item.content_type === "livestream";
+                  const isVideo = item.content_type === "video";
+                  const isArticle = item.content_type === "article";
+                  const isLivestream = item.content_type === "livestream";
 
-  const title = isVideo
-    ? item.caption
-    : isArticle
-    ? item.title
-    : item.name;
+                  const title = isVideo
+                    ? item.caption
+                    : isArticle
+                    ? item.title
+                    : item.name;
 
-  const subtitle = isVideo
-    ? `${item.view_count ?? 0} views · ${item.like_count ?? 0} likes`
-    : isArticle
-    ? item.summary
-    : `${item.active_participants_count ?? 0} participants`;
+                  const subtitle = isVideo
+                    ? `${item.view_count ?? 0} views · ${item.like_count ?? 0} likes`
+                    : isArticle
+                    ? item.summary
+                    : `${item.active_participants_count ?? 0} participants`;
 
-  const image = isVideo || isArticle
-    ? item.thumbnail
-    : item.creator_image;
+                  const image = isVideo || isArticle
+                    ? item.thumbnail
+                    : item.creator_image;
 
-  const poster = isVideo
-    ? item.tags || "—"
-    : isArticle
-    ? item.author_name
-    : item.creator_name;
+                  const poster = isVideo
+                    ? item.tags || "—"
+                    : isArticle
+                    ? item.author_name
+                    : item.creator_name;
 
-  const typeLabel: Record<string, string> = {
-    video: "Video",
-    article: "Article",
-    livestream: "Live",
-    influencer_content: "Influencer",
-  };
+                  const typeLabel: Record<string, string> = {
+                    video: "Video",
+                    article: "Article",
+                    livestream: "Live",
+                    influencer_content: "Influencer",
+                  };
 
-  return (
-    <div key={i} className="flex items-center gap-3 py-3">
-      <div className="w-10 h-10 rounded-lg shrink-0 overflow-hidden bg-muted flex items-center justify-center">
-        {image ? (
-          <img src={image} alt={title} className="w-full h-full object-cover" />
-        ) : (
-          <span className="text-[10px] text-muted-foreground font-medium uppercase">
-            {typeLabel[item.content_type] ?? "—"}
-          </span>
-        )}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-foreground truncate">
-          {title || "Untitled"}
-        </p>
-        <p className="text-xs text-muted-foreground truncate">{subtitle}</p>
-      </div>
-      <div className="shrink-0 text-right">
-        <p className="text-xs text-muted-foreground truncate max-w-[80px]">
-          {isVideo ? item.tags || "—" : `By ${poster}`}
-        </p>
-        <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded">
-          {typeLabel[item.content_type] ?? "—"}
-        </span>
-      </div>
-    </div>
-  );
-})
+                  return (
+                    <div key={i} className="flex items-center gap-3 py-3">
+                      <div className="w-10 h-10 rounded-lg shrink-0 overflow-hidden bg-muted flex items-center justify-center">
+                        {image ? (
+                          <img src={image} alt={title} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground font-medium uppercase">
+                            {typeLabel[item.content_type] ?? "—"}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {title || "Untitled"}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">{subtitle}</p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="text-xs text-muted-foreground truncate max-w-[80px]">
+                          {isVideo ? item.tags || "—" : `By ${poster}`}
+                        </p>
+                        <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded">
+                          {typeLabel[item.content_type] ?? "—"}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
               )}
             </div>
           )}
@@ -360,28 +366,35 @@ export default function AnalyticsDashboard() {
             />
           </div>
           <div className="flex flex-col gap-3 mt-2">
+            
+            {/* General Users Breakdown */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-sm bg-primary" />
-                <span className="text-sm text-muted-foreground">
-                  General Users {!loading && `(${customersCount})`}
-                </span>
+                <span className="text-sm text-muted-foreground">General Users</span>
               </div>
               <span className="text-sm font-semibold text-foreground">
-                {customersPercent.toFixed(1)}%
+                {loading ? "..." : customersCount.toLocaleString()} 
+                <span className="text-xs text-muted-foreground font-normal ml-1">
+                  ({customersPercent.toFixed(1)}%)
+                </span>
               </span>
             </div>
+
+            {/* Sellers Breakdown */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-sm bg-pink-500" />
-                <span className="text-sm text-muted-foreground">
-                  Sellers {!loading && `(${sellersCount})`}
-                </span>
+                <span className="text-sm text-muted-foreground">Sellers</span>
               </div>
               <span className="text-sm font-semibold text-foreground">
-                {sellersPercent.toFixed(1)}%
+                {loading ? "..." : sellersCount.toLocaleString()} 
+                <span className="text-xs text-muted-foreground font-normal ml-1">
+                  ({sellersPercent.toFixed(1)}%)
+                </span>
               </span>
             </div>
+
           </div>
         </div>
 

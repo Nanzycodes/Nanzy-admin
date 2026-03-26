@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { format } from "date-fns";
+import { format, subDays } from "date-fns";
 import apiClient from "@/lib/apiclient";
 
 interface OrdersTableProps {
@@ -39,12 +39,19 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [orders, setOrders] = useState<Order[]>([]);
-  const [totalCount, setTotalCount] = useState(0);
+  const [tableTotalCount, setTableTotalCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Stats State
+  const [globalTotalOrders, setGlobalTotalOrders] = useState(0);
+  const [totalTrend, setTotalTrend] = useState("0%");
+
   const [transitCount, setTransitCount] = useState(0);
+  const [transitTrend, setTransitTrend] = useState("0%");
+
   const [deliveredCount, setDeliveredCount] = useState(0);
+  const [deliveredTrend, setDeliveredTrend] = useState("0%");
 
   const [filterStatus, setFilterStatus] = useState<OrderStatus | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -67,22 +74,56 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
     setCurrentPage(1);
   }, [activeTab, search, filterStatus, dateFrom, dateTo]);
 
+  // Fetch Stats & Trends
   useEffect(() => {
     async function fetchCounts() {
       try {
-        const [transitRes, deliveredRes] = await Promise.all([
+        const today = new Date();
+        const lastWeek = format(subDays(today, 7), "yyyy-MM-dd");
+        const twoWeeksAgo = format(subDays(today, 14), "yyyy-MM-dd");
+
+        const [
+          totalRes, totalThisWeekRes, totalLastWeekRes,
+          transitRes, transitThisWeekRes, transitLastWeekRes,
+          deliveredRes, deliveredThisWeekRes, deliveredLastWeekRes
+        ] = await Promise.all([
+          apiClient.get(`/admin/orders/?page_size=1`),
+          apiClient.get(`/admin/orders/?created_after=${lastWeek}&page_size=1`),
+          apiClient.get(`/admin/orders/?created_after=${twoWeeksAgo}&created_before=${lastWeek}&page_size=1`),
+
           apiClient.get(`/admin/orders/?status=IN_TRANSIT&page_size=1`),
+          apiClient.get(`/admin/orders/?status=IN_TRANSIT&created_after=${lastWeek}&page_size=1`),
+          apiClient.get(`/admin/orders/?status=IN_TRANSIT&created_after=${twoWeeksAgo}&created_before=${lastWeek}&page_size=1`),
+
           apiClient.get(`/admin/orders/?status=DELIVERED&page_size=1`),
+          apiClient.get(`/admin/orders/?status=DELIVERED&created_after=${lastWeek}&page_size=1`),
+          apiClient.get(`/admin/orders/?status=DELIVERED&created_after=${twoWeeksAgo}&created_before=${lastWeek}&page_size=1`),
         ]);
-        setTransitCount(transitRes.data?.count ?? 0);
-        setDeliveredCount(deliveredRes.data?.count ?? 0);
+
+        const getCount = (res: any) => res.data?.data?.count ?? res.data?.count ?? 0;
+
+        const calcTrend = (current: number, previous: number) => {
+          if (previous === 0) return current > 0 ? "+100%" : "0%";
+          const percent = Math.round(((current - previous) / previous) * 100);
+          return `${percent > 0 ? "+" : ""}${percent}%`;
+        };
+
+        setGlobalTotalOrders(getCount(totalRes));
+        setTotalTrend(calcTrend(getCount(totalThisWeekRes), getCount(totalLastWeekRes)));
+
+        setTransitCount(getCount(transitRes));
+        setTransitTrend(calcTrend(getCount(transitThisWeekRes), getCount(transitLastWeekRes)));
+
+        setDeliveredCount(getCount(deliveredRes));
+        setDeliveredTrend(calcTrend(getCount(deliveredThisWeekRes), getCount(deliveredLastWeekRes)));
       } catch {
-        // silently fail
+        // silently fail stats
       }
     }
     fetchCounts();
   }, []);
 
+  // Fetch Table Data
   useEffect(() => {
     async function fetchOrders() {
       setLoading(true);
@@ -98,17 +139,20 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
         if (dateTo) params.append("created_before", format(dateTo, "yyyy-MM-dd"));
 
         const response = await apiClient.get(`/admin/orders/?${params.toString()}`);
-        const data = response.data;
+        const payload = response.data;
 
-        if (data.data?.results) {
-          setOrders(data.data.results);
-          setTotalCount(data.data.count);
-        } else if (Array.isArray(data)) {
-          setOrders(data);
-          setTotalCount(data.length);
+        const results = payload?.data?.results || payload?.results;
+        const count = payload?.data?.count ?? payload?.count ?? 0;
+
+        if (results) {
+          setOrders(results);
+          setTableTotalCount(count);
+        } else if (Array.isArray(payload?.data)) {
+          setOrders(payload.data);
+          setTableTotalCount(payload.data.length);
         } else {
           setOrders([]);
-          setTotalCount(0);
+          setTableTotalCount(0);
         }
       } catch {
         setError("Failed to load orders. Please try again.");
@@ -119,38 +163,22 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
     fetchOrders();
   }, [currentPage, activeTab, search, filterStatus, dateFrom, dateTo]);
 
+  // SAFE API DETAIL PARSING
   async function handleViewDetails(order: Order) {
+    if (!order?.id) {
+      alert("This order is missing an ID.");
+      return;
+    }
     try {
       const response = await apiClient.get(`/admin/orders/${order.id}/`);
-      onViewDetails(response.data);
+      const detailData = response.data?.data || response.data;
+      onViewDetails(detailData);
     } catch {
       alert("Could not load order details. Please try again.");
     }
   }
 
-  async function handleStatusUpdate(orderId: string, newStatus: OrderStatus) {
-    try {
-      await apiClient.patch(`/admin/orders/${orderId}/`, { status: newStatus });
-      setOrders((prev) =>
-        prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
-      );
-    } catch {
-      alert("Could not update order status. Please try again.");
-    }
-  }
-
-  async function handleDeleteOrder(orderId: string) {
-    if (!confirm("Are you sure you want to cancel this order?")) return;
-    try {
-      await apiClient.delete(`/admin/orders/${orderId}/delete/`);
-      setOrders((prev) => prev.filter((o) => o.id !== orderId));
-      setTotalCount((prev) => prev - 1);
-    } catch {
-      alert("Could not cancel order. Please try again.");
-    }
-  }
-
-  const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE));
+  const totalPages = Math.max(1, Math.ceil(tableTotalCount / ITEMS_PER_PAGE));
 
   function getPageNumbers(): (number | "...")[] {
     const pages: (number | "...")[] = [];
@@ -170,7 +198,7 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
 
   return (
     <div>
-      {/* ── Stat cards ── */}
+      {/* ── Stat cards (YOUR EXACT UI) ── */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         <StatCard
           icon={
@@ -182,8 +210,8 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
             </div>
           }
           label="Total orders"
-          value={String(totalCount)}
-          trend="9%"
+          value={String(globalTotalOrders)}
+          trend={totalTrend}
         />
         <StatCard
           icon={
@@ -196,7 +224,7 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
           }
           label="Orders in transit"
           value={String(transitCount)}
-          trend="4%"
+          trend={transitTrend}
         />
         <StatCard
           icon={
@@ -210,7 +238,7 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
           }
           label="Orders delivered"
           value={String(deliveredCount)}
-          trend="5%"
+          trend={deliveredTrend}
         />
       </div>
 
@@ -245,7 +273,6 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
             />
           </div>
 
-          {/* Filter */}
           <div className="relative" ref={filterRef}>
             <button
               onClick={() => setFilterOpen((prev) => !prev)}
@@ -276,7 +303,6 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
             )}
           </div>
 
-          {/* Date From */}
           <Popover>
             <PopoverTrigger asChild>
               <button className={`ml-auto flex items-center gap-2 text-sm border rounded-md px-3 h-9 transition-colors
@@ -295,7 +321,6 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
             </PopoverContent>
           </Popover>
 
-          {/* Date To */}
           <Popover>
             <PopoverTrigger asChild>
               <button className={`flex items-center gap-2 text-sm border rounded-md px-3 h-9 transition-colors
@@ -366,11 +391,12 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground">{order.items_count} item{order.items_count === 1 ? '' : 's'}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{order.items_count} item{order.items_count === "1" ? '' : 's'}</td>
                     <td className="px-4 py-3 text-muted-foreground">{order.items_count}</td>
                     <td className="px-4 py-3 text-muted-foreground">
                       {(() => {
                         const d = new Date(order.created_at);
+                        if (isNaN(d.getTime())) return "—";
                         const day = String(d.getDate()).padStart(2, '0');
                         const month = String(d.getMonth() + 1).padStart(2, '0');
                         const year = d.getFullYear();
@@ -445,6 +471,7 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
   );
 }
 
+// EXACT ORIGINAL STATCARD UI RESTORED
 function StatCard({ icon, label, value, trend }: { icon: React.ReactNode; label: string; value: string; trend: string }) {
   return (
     <div className="bg-white rounded-xl border border-border p-4">
@@ -473,6 +500,8 @@ function StatusBadge({ status }: { status: OrderStatus }) {
     REJECTED: "bg-red-50 text-red-600 border-red-200",
     PENDING: "bg-orange-50 text-orange-600 border-orange-200",
     CANCELLED: "bg-gray-50 text-gray-600 border-gray-200",
+    PAID: "bg-blue-50 text-blue-600 border-blue-200",
+    SHIPPED: "bg-cyan-50 text-cyan-600 border-cyan-200"
   };
   return (
     <span className={`inline-flex items-center px-3 py-1 rounded-md text-xs font-medium border ${styles[status]}`}>

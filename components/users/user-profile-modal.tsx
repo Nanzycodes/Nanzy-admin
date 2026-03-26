@@ -87,9 +87,7 @@ export default function UserProfileModal({
           <Button variant="outline" className="flex-1" onClick={onClose}>
             Close
           </Button>
-          <Button className="flex-1" onClick={onEdit}>
-            Edit User
-          </Button>
+          
         </div>
       </div>
     </div>

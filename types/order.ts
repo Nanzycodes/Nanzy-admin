@@ -23,7 +23,7 @@ export interface Order {
   customer: string;
   customer_email: string;
   total_amount: string;
-  items_count: number;
+  items_count: string;
   status: OrderStatus;
   created_at: string;
   updated_at: string;
