@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import Image, { StaticImageData } from "next/image";
 import React, { useState } from "react";
 import CustomDropdown from "../custom-dropdown";
 import { CalendarRange } from "lucide-react";
@@ -13,7 +13,7 @@ function DashboardCardContainer({
   className = "",
 }: {
   cardTitle: string;
-  titleIcon: string;
+  titleIcon: string | StaticImageData;
   children: React.ReactNode;
   className?: string;
 }) {
