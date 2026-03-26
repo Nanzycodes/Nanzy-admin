@@ -473,6 +473,8 @@ function StatusBadge({ status }: { status: OrderStatus }) {
     REJECTED: "bg-red-50 text-red-600 border-red-200",
     PENDING: "bg-orange-50 text-orange-600 border-orange-200",
     CANCELLED: "bg-gray-50 text-gray-600 border-gray-200",
+    PAID: "bg-blue-50 text-blue-700 border-blue-200",
+    SHIPPED: "bg-cyan-50 text-cyan-700 border-cyan-200",
   };
   return (
     <span className={`inline-flex items-center px-3 py-1 rounded-md text-xs font-medium border ${styles[status]}`}>

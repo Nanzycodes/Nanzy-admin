@@ -1,11 +1,13 @@
 // types/order.ts
 
 // ── API status values (from backend) ──
-export type OrderStatus = "PENDING" | "IN_TRANSIT" | "DELIVERED" | "REJECTED" | "CANCELLED";
+export type OrderStatus = "PENDING" | "PAID" | "SHIPPED" | "IN_TRANSIT" | "DELIVERED" | "REJECTED" | "CANCELLED";
 
 // ── Used for display labels and badge colors ──
 export const STATUS_LABELS: Record<OrderStatus, string> = {
   PENDING: "Pending",
+  PAID: "Paid",
+  SHIPPED: "Shipped",
   IN_TRANSIT: "In-transit",
   DELIVERED: "Delivered",
   REJECTED: "Rejected",
@@ -27,7 +29,7 @@ export interface Order {
   customer: string;
   customer_email: string;
   total_amount: string;
-  items_count: string;
+  items_count: number;
   status: OrderStatus;
   created_at: string;
   updated_at: string;
@@ -48,7 +50,7 @@ export interface OrderDetail {
   escrow_reference: string;
   delivery_confirmed_at: string;
   delivery_confirmed_by: string;
-  items_count: string;
+  items_count: number;
   is_escrow_active: boolean;
   tracking_number: string;
   carrier_name: string;

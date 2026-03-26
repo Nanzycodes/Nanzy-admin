@@ -196,6 +196,8 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
 function StatusPill({ status }: { status: OrderStatus }) {
   const styles: Record<OrderStatus, string> = {
     PENDING: "bg-orange-100 text-orange-700",
+    PAID: "bg-blue-100 text-blue-700",
+    SHIPPED: "bg-cyan-100 text-cyan-700",
     IN_TRANSIT: "bg-green-100 text-green-700",
     DELIVERED: "bg-purple-100 text-purple-700",
     REJECTED: "bg-red-100 text-red-600",
