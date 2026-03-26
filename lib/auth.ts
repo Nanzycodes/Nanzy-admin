@@ -70,6 +70,21 @@ export interface ResetPasswordResponse {
 }
 
 // ============================================
+// Admin Profile Types
+// ============================================
+
+export interface AdminProfile {
+  id: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  roles: string;
+  status: string;
+  is_active: boolean;
+  date_joined: string;
+}
+
+// ============================================
 // Admin Auth API Functions
 // ============================================
 
@@ -122,6 +137,44 @@ login: async (data: AdminLoginRequest): Promise<AdminLoginResponse> => {
       data
     );
     return response.data;
+  },
+
+  // Invite admin
+  inviteAdmin: async (data: {
+    email: string;
+    first_name: string;
+    last_name: string;
+  }): Promise<void> => {
+    await apiClient.post(`${ADMIN_BASE}/invite/`, data);
+  },
+
+  // Change password
+  changePassword: async (password: string): Promise<void> => {
+    await apiClient.post(`${ADMIN_BASE}/change-password/`, { password });
+  },
+
+  // Get current admin profile
+  getProfile: async (): Promise<AdminProfile> => {
+    const response = await apiClient.get<{ data: AdminProfile }>(
+      `${ADMIN_BASE}/me/profile/`
+    );
+    return response.data.data;
+  },
+
+  // List all admins
+  getAdmins: async (): Promise<{ count: number; results: import("@/types/user").AdminEntry[] }> => {
+    const response = await apiClient.get<{
+      success: boolean;
+      message: string;
+      data: {
+        count: number;
+        next: string | null;
+        previous: string | null;
+        results: import("@/types/user").AdminEntry[];
+      };
+      errors: any;
+    }>(`${ADMIN_BASE}/admins/`, { params: { page_size: 100 } });
+    return response.data.data;
   },
 
   // Logout

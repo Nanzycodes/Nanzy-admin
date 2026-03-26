@@ -160,7 +160,6 @@ export default function UserFormModal({
               <SelectContent>
                 <SelectItem value="user">User</SelectItem>
                 <SelectItem value="seller">Seller</SelectItem>
-                <SelectItem value="delivery_partner">Delivery Partner</SelectItem>
                 <SelectItem value="influencer">Influencer</SelectItem>
               </SelectContent>
             </Select>
