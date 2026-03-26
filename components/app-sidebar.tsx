@@ -8,6 +8,7 @@ import {
   CreditCard,
   Package,
   TrendingUp,
+  Settings,
 } from "lucide-react";
 // import {
 //   LayoutGrid,
@@ -26,10 +27,15 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
+import { usePathname } from "next/navigation";
 import { pearlyLogo } from "@/lib/utils";
 import { useEffect } from "react";
+import adminAuthApi, { AdminProfile } from "@/lib/auth";
 
 export const navData = {
   user: {
@@ -75,23 +81,20 @@ export const navData = {
       url: "/analytics",
       icon: TrendingUp,
     },
+    // {
+    //   title: "Settings",
+    //   url: "/settings",
+    //   icon: Settings,
+    // },
   ],
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const [user, setUser] = React.useState(null);
+  const [user, setUser] = React.useState<AdminProfile | null>(null);
+  const pathname = usePathname();
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const userInfo = localStorage.getItem("pearly-admin");
-        if (userInfo) {
-          setUser(JSON.parse(userInfo));
-        }
-      } catch (err) {
-        console.error("Failed to parse user from localStorage", err);
-      }
-    }
+    adminAuthApi.getProfile().then(setUser).catch(console.error);
   }, []);
 
   return (
@@ -99,7 +102,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       collapsible="icon"
       {...props}
       variant="sidebar"
-      className="bg-[#FFFFFF] border-[1px] border-[#E6E6E6]"
+      className="bg-[#FFFFFF] border border-[#E6E6E6]"
     >
       <SidebarHeader>
         <TeamSwitcher teams={navData.teams} />
@@ -108,6 +111,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavMain items={navData.navMain} />
       </SidebarContent>
       <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild isActive={pathname === "/settings"}>
+              <a href="/settings" className="flex items-center gap-2">
+                <Settings className={`w-4.5 h-4.5 ${pathname === "/settings" ? "text-[#635BFF]" : ""}`} />
+                <span>Settings</span>
+              </a>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
         <NavUser user={user} />
       </SidebarFooter>
       <SidebarRail className="-" />
