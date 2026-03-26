@@ -24,8 +24,10 @@ function DashboardCardContainer({
   };
 
   return (
-    <div className={`px-4 py-3 bg-[#FFFFFF66] border border-[#fffefb] rounded-[5px] h-full flex flex-col ${className}`}>
-      <div className="flex justify-between items-center mb-4 shrink-0">
+    // Changed h-full to h-fit so it hugs the content
+    // Removed flex flex-col unless you specifically need it for alignment
+    <div className={`px-4 py-3 bg-[#FFFFFF66] border border-[#fffefb] rounded-[5px] h-fit ${className}`}>
+      <div className="flex justify-between items-center mb-4">
         <div className="flex gap-x-2 items-center">
           <Image src={titleIcon} alt="icons" width={20} height={20} />
           <p className="font-medium text-[#1A1A1A]">{cardTitle}</p>
@@ -40,7 +42,8 @@ function DashboardCardContainer({
           <Image src={BoxDiagonalArrow} alt="icons" className="cursor-pointer" />
         </div>
       </div>
-      <div className="flex-1">{children}</div>
+      {/* Removed flex-1 so this div doesn't stretch */}
+      <div>{children}</div>
     </div>
   );
 }

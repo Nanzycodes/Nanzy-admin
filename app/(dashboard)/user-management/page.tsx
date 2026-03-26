@@ -6,8 +6,8 @@ import UserFormModal from "@/components/users/user-form-modal";
 import UserProfileModal from "@/components/users/user-profile-modal";
 import DeleteUserDialog from "@/components/users/delete-user-dialog";
 import { User, UserRole } from "@/types/user";
-import { TrendingUp } from "lucide-react";
 import apiClient from "@/lib/apiclient";
+import { subDays, subMonths, format } from "date-fns";
 
 const TABS: { label: string; role: UserRole | "all" }[] = [
   { label: "Users", role: "all" },
@@ -23,21 +23,47 @@ export default function UsersPage() {
 
   // ── Stat counts ──
   const [totalUsers, setTotalUsers] = useState(0);
+  const [usersSinceLastMonth, setUsersSinceLastMonth] = useState(0);
+
   const [activeUsers, setActiveUsers] = useState(0);
+  const [activeSinceLastWeek, setActiveSinceLastWeek] = useState(0);
+
   const [pendingUsers, setPendingUsers] = useState(0);
+  const [pendingSinceLastWeek, setPendingSinceLastWeek] = useState(0);
 
   useEffect(() => {
     async function fetchCounts() {
       try {
-        const [totalRes, activeRes, pendingRes] = await Promise.all([
+        const today = new Date();
+        const lastWeek = format(subDays(today, 7), "yyyy-MM-dd");
+        const lastMonth = format(subMonths(today, 1), "yyyy-MM-dd");
+
+        const [
+          totalRes,
+          totalLastMonthRes,
+          activeRes,
+          activeLastWeekRes,
+          pendingRes,
+          pendingLastWeekRes
+        ] = await Promise.all([
           apiClient.get(`/admin/customers/?page_size=1`),
-          apiClient.get(`/admin/customers/?page_size=1&status=active`),
-          apiClient.get(`/admin/customers/?page_size=1&status=pending`),
+          apiClient.get(`/admin/customers/?created_after=${lastMonth}&page_size=1`),
+          apiClient.get(`/admin/customers/?status=active&page_size=1`),
+          apiClient.get(`/admin/customers/?status=active&created_after=${lastWeek}&page_size=1`),
+          apiClient.get(`/admin/customers/?status=pending&page_size=1`),
+          apiClient.get(`/admin/customers/?status=pending&created_after=${lastWeek}&page_size=1`)
         ]);
+
+        // Safely extract counts based on our nested data discovery
         setTotalUsers(totalRes.data?.data?.count ?? 0);
-setActiveUsers(activeRes.data?.data?.count ?? 0);
-setPendingUsers(pendingRes.data?.data?.count ?? 0);   
-   } catch {
+        setUsersSinceLastMonth(totalLastMonthRes.data?.data?.count ?? 0);
+
+        setActiveUsers(activeRes.data?.data?.count ?? 0);
+        setActiveSinceLastWeek(activeLastWeekRes.data?.data?.count ?? 0);
+
+        setPendingUsers(pendingRes.data?.data?.count ?? 0);
+        setPendingSinceLastWeek(pendingLastWeekRes.data?.data?.count ?? 0);
+      } catch {
         // silently fail
       }
     }
@@ -77,9 +103,21 @@ setPendingUsers(pendingRes.data?.data?.count ?? 0);
 
       {/* ── Stat cards ── */}
       <div className="grid grid-cols-3 gap-4 mb-6">
-        <StatCard label="Total Users" value={totalUsers} trend="3,982 since last month" />
-        <StatCard label="Active Users" value={activeUsers} trend="382 since last week" />
-        <StatCard label="Pending Users" value={pendingUsers} trend="82 since last week" />
+        <StatCard 
+          label="Total Users" 
+          value={totalUsers} 
+          trend={`${usersSinceLastMonth.toLocaleString()} since last month`} 
+        />
+        <StatCard 
+          label="Active Users" 
+          value={activeUsers} 
+          trend={`${activeSinceLastWeek.toLocaleString()} since last week`} 
+        />
+        <StatCard 
+          label="Pending Users" 
+          value={pendingUsers} 
+          trend={`${pendingSinceLastWeek.toLocaleString()} since last week`} 
+        />
       </div>
 
       {/* ── Users Table ── */}
