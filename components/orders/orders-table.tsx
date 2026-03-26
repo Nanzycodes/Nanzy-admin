@@ -366,7 +366,7 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground">{order.items_count} item{order.items_count === '1' ? '' : 's'}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{order.items_count} item{order.items_count === 1 ? '' : 's'}</td>
                     <td className="px-4 py-3 text-muted-foreground">{order.items_count}</td>
                     <td className="px-4 py-3 text-muted-foreground">
                       {(() => {
