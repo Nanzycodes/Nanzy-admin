@@ -1,44 +1,51 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { fetchAnalytics } from "@/lib/analytics";
+import { fetchAnalytics, fetchCustomerMetrics, fetchTopContent, fetchTopSellers } from "@/lib/analytics";
 import { TrendingUp, ChevronDown, ArrowUpRight, Calendar } from "lucide-react";
 
-// ── Total Users chart — jagged line with dots ──
-function TotalUsersChart() {
+function UsersChart({ chartData }: { chartData: { count: number }[] }) {
+  if (!chartData || chartData.length === 0) return null;
+  const counts = chartData.map((d) => d.count);
+  const max = Math.max(...counts, 1);
+  const width = 208;
+  const height = 120;
+  const points = counts.map((count, i) => {
+    const x = (i / (counts.length - 1)) * width;
+    const y = height - (count / max) * (height - 10) - 5;
+    return `${x},${y}`;
+  });
+  const pathD = `M ${points.join(" L ")}`;
   return (
-    <svg width="100%" height="120" viewBox="0 0 208 120" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ display: "block" }}>
-      <path d="M1.78027 84.4191L10.717 78.9733L19.4942 69.2979L28.2713 64.4901L37.2081 74.0278L45.9852 71.9083L54.922 69.2979L63.8587 53.9396H72.6359L81.5726 58.8381L90.3498 66.2563L99.2865 60.9576L108.064 37.2899L117 32.6976L125.778 39.4114L134.555 41.8821L143.491 37.2899L152.269 46.8276L161.205 48.2406L169.982 53.9396L178.919 63.4303L187.696 58.8381L196.633 44.0016L205.41 14.6875" stroke="#B2ADFF" strokeWidth="0.89" strokeLinecap="round" strokeLinejoin="round"/>
-      <path d="M1.78027 84.4191L10.717 78.9733L19.4942 69.2979L28.2713 64.4901L37.2081 74.0278L45.9852 71.9083L54.922 69.2979L63.8587 53.9396H72.6359L81.5726 58.8381L90.3498 66.2563L99.2865 60.9576L108.064 37.2899L117 32.6976L125.778 39.4114L134.555 41.8821L143.491 37.2899L152.269 46.8276L161.205 48.2406L169.982 53.9396L178.919 63.4303L187.696 58.8381L196.633 44.0016L205.41 14.6875" stroke="#B2ADFF" strokeWidth="3.56" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="0 22.25"/>
-      <path d="M1.78027 84.4191L10.717 78.9733L19.4942 69.2979L28.2713 64.4901L37.2081 74.0278L45.9852 71.9083L54.922 69.2979L63.8587 53.9396H72.6359L81.5726 58.8381L90.3498 66.2563L99.2865 60.9576L108.064 37.2899L117 32.6976L125.778 39.4114L134.555 41.8821L143.491 37.2899L152.269 46.8276L161.205 48.2406L169.982 53.9396L178.919 63.4303L187.696 58.8381L196.633 44.0016L205.41 14.6875" stroke="white" strokeWidth="2.67" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="0 22.25"/>
-      <path d="M1.78027 90.6479L10.717 67.9401L19.4942 59.1601L28.2713 47.8715L37.2081 49.1257L45.9852 44.1086L54.922 49.1257L63.8587 44.1086L72.6359 46.6172H81.5726L90.3498 51.0072H99.2865L108.064 44.1086L117 38.7796L125.778 35.3285H134.555L143.491 31.5657L152.269 27.4892L161.205 31.5657L169.983 38.7796L178.919 53.5157L187.696 52.2615L195.671 39.2698L200.541 24.3535L205.41 1.78125" stroke="#BABABA" strokeWidth="0.89" strokeLinecap="round" strokeLinejoin="round"/>
-      <path d="M1.78027 90.6479L10.717 67.9401L19.4942 59.1601L28.2713 47.8715L37.2081 49.1257L45.9852 44.1086L54.922 49.1257L63.8587 44.1086L72.6359 46.6172H81.5726L90.3498 51.0072H99.2865L108.064 44.1086L117 38.7796L125.778 35.3285H134.555L143.491 31.5657L152.269 27.4892L161.205 31.5657L169.983 38.7796L178.919 53.5157L187.696 52.2615L195.671 39.2698L200.541 24.3535L205.41 1.78125" stroke="#BABABA" strokeWidth="3.56" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="0 22.25"/>
-      <path d="M1.78027 90.6479L10.717 67.9401L19.4942 59.1601L28.2713 47.8715L37.2081 49.1257L45.9852 44.1086L54.922 49.1257L63.8587 44.1086L72.6359 46.6172H81.5726L90.3498 51.0072H99.2865L108.064 44.1086L117 38.7796L125.778 35.3285H134.555L143.491 31.5657L152.269 27.4892L161.205 31.5657L169.983 38.7796L178.919 53.5157L187.696 52.2615L195.671 39.2698L200.541 24.3535L205.41 1.78125" stroke="white" strokeWidth="2.67" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="0 22.25"/>
+    <svg width="100%" height="120" viewBox={`0 0 ${width} ${height}`} fill="none">
+      <path d={pathD} stroke="#B2ADFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
 
-// ── New Users / Uploads chart — smooth wavy line, no dots ──
-function SmoothWaveChart() {
+function SmoothWaveChart({ chartData }: { chartData: { count: number }[] }) {
+  if (!chartData || chartData.length === 0) return null;
+  const counts = chartData.map((d) => d.count);
+  const max = Math.max(...counts, 1);
+  const width = 150;
+  const height = 60;
+  const points = counts.map((count, i) => {
+    const x = (i / (counts.length - 1)) * width;
+    const y = height - (count / max) * (height - 10) - 5;
+    return `${x},${y}`;
+  });
+  const pathD = `M ${points.join(" L ")}`;
   return (
-    <svg width="100%" height="60" viewBox="0 0 150 60" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ display: "block" }}>
-      <path opacity="0.1" fillRule="evenodd" clipRule="evenodd" d="M1 23.3754C1 23.3754 6.82659 22.5824 13.4511 24.4875C26.0505 28.1109 26.7692 21.4756 31.4412 18.2762C35.7156 15.3491 39.2555 17.135 44.0147 20.7146C47.5248 23.3548 52.6404 27.7865 57.938 27.073C62.7807 26.4209 66.2137 21.2231 72.9261 19.9012C78.2461 18.8535 82.5695 21.7318 88.6955 20.7146C97.0059 19.3349 100.718 11.2119 106.658 11.2119C113.988 11.2119 119.149 4.3418 125.818 4.3418C132.448 4.3418 133.347 8.38159 140.599 11.2119C146.143 13.3757 148.811 11.2119 148.811 11.2119V34.3986H1V23.3754Z" fill="url(#paint0_linear_wave)"/>
-      <path d="M1 19.7745C1 19.7745 6.82659 18.9929 13.4511 20.8705C26.0505 24.4414 26.7692 17.9022 31.4412 14.7491C35.7156 11.8644 39.2555 13.6244 44.0147 17.1522C47.5248 19.7541 52.6404 24.1217 57.938 23.4186C62.7807 22.7758 66.2137 17.6533 72.9261 16.3505C78.2461 15.318 82.5695 18.1546 88.6955 17.1522C97.0059 15.7924 100.718 7.78703 106.658 7.78703C113.988 7.78703 119.149 1 125.818 1C132.448 1 132.8 4.99768 140.052 7.78703C145.596 9.91951 148.811 7.78703 148.811 7.78703" stroke="#B2ADFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-      <defs>
-        <linearGradient id="paint0_linear_wave" x1="27.7133" y1="19.5928" x2="27.7133" y2="60" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#635BFF"/>
-          <stop offset="1" stopColor="white" stopOpacity="0.01"/>
-        </linearGradient>
-      </defs>
+    <svg width="100%" height="60" viewBox={`0 0 ${width} ${height}`} fill="none">
+      <path d={pathD} stroke="#B2ADFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
 
-function DonutChart() {
+function DonutChart({ customersPercent, sellersPercent }: { customersPercent: number; sellersPercent: number }) {
   const radius = 80;
   const cx = 110;
   const cy = 110;
-  const circumference = 2 * Math.PI * radius;
 
   function getArc(startPercent: number, endPercent: number, color: string) {
     const startAngle = (startPercent / 100) * 360 - 90;
@@ -63,34 +70,58 @@ function DonutChart() {
   return (
     <svg width="220" height="220" viewBox="0 0 220 220">
       <circle cx={cx} cy={cy} r={radius} stroke="#f3f4f6" strokeWidth="40" fill="none" />
-      {getArc(0, 65.8, "#635bff")}
-      {getArc(65.8, 86.3, "#ec4899")}
+      {getArc(0, customersPercent, "#635bff")}
+      {getArc(customersPercent, customersPercent + sellersPercent, "#ec4899")}
     </svg>
   );
 }
 
-// ── THE FIX: WRAP EVERYTHING IN A FUNCTION ──
 export default function AnalyticsDashboard() {
   const [topTab, setTopTab] = useState<"contents" | "sellers">("contents");
   const [analytics, setAnalytics] = useState<any>(null);
+  const [metrics, setMetrics] = useState<any>(null);
+  const [topContent, setTopContent] = useState<any[]>([]);
+  const [topSellers, setTopSellers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchAnalytics().then(setAnalytics).catch(() => setAnalytics(null));
+    Promise.all([
+      fetchAnalytics().catch(() => null),
+      fetchCustomerMetrics().catch(() => null),
+      fetchTopContent().catch(() => []),
+      fetchTopSellers().catch(() => []),
+    ]).then(([analyticsData, metricsData, contentData, sellersData]) => {
+      setAnalytics(analyticsData);
+      setMetrics(metricsData);
+      setTopContent(contentData);
+      setTopSellers(sellersData);
+    }).finally(() => setLoading(false));
   }, []);
 
-  const topPerforming = [
-    { title: "The best hand made Denims", subtitle: "The best handmade Denims you can find in Lagos....", poster: "Olamade" },
-    { title: "The best hand made Denims", subtitle: "The best handmade Denims you can find in Lagos....", poster: "Olamade" },
-    { title: "The best hand made Denims", subtitle: "The best handmade Denims you can find in Lagos....", poster: "Olamade" },
-    { title: "The best hand made Denims", subtitle: "The best handmade Denims you can find in Lagos....", poster: "Olamade" },
-    { title: "The best hand made Denims", subtitle: "The best handmade Denims you can find in Lagos....", poster: "Olamade" },
-  ];
+  // ── Extract data from analytics API ──
+  const totalUsers = analytics?.users?.total ?? 0;
+  const usersWeeklyChange = analytics?.users?.weekly_change ?? 0;
+  const usersChart = analytics?.users?.chart ?? [];
+  const totalUploads = analytics?.uploads?.total ?? 0;
+  const uploadsWeeklyChange = analytics?.uploads?.weekly_change ?? 0;
+  const uploadsChart = analytics?.uploads?.chart ?? [];
+  const totalUsersCount = analytics?.user_distribution?.total_users ?? 0;
+  const customersPercent = analytics?.user_distribution?.customers?.percentage ?? 0;
+  const sellersPercent = analytics?.user_distribution?.sellers?.percentage ?? 0;
+  const customersCount = analytics?.user_distribution?.customers?.count ?? 0;
+  const sellersCount = analytics?.user_distribution?.sellers?.count ?? 0;
+
+  // ── Extract data from metrics API ──
+  const newUsers = metrics?.total_customers?.new_since_last_month ?? 0;
+
+  const isUp = (val: number) => val >= 0;
 
   return (
     <div className="flex flex-col gap-4">
 
       {/* ── Row 1: 3 metric cards ── */}
       <div className="grid grid-cols-3 gap-4">
+
         {/* Card 1 — Total Users */}
         <div className="bg-white rounded-xl border border-border p-3 col-span-1 flex flex-col justify-between" style={{ minHeight: 180 }}>
           <p className="text-sm font-medium text-foreground mb-0.5 mt-4">Total Users</p>
@@ -100,11 +131,20 @@ export default function AnalyticsDashboard() {
           <div className="flex items-end gap-2 flex-1">
             <div className="flex flex-col justify-end">
               <div className="flex items-center gap-2 mb-2 mt-2">
-                <p className="text-3xl font-bold text-foreground">145,760</p>
-                <span className="text-green-500 text-lg">▲</span>
+                <p className="text-3xl font-bold text-foreground">
+                  {loading ? "..." : totalUsers.toLocaleString()}
+                </p>
+                <span className={isUp(usersWeeklyChange) ? "text-green-500 text-lg" : "text-red-500 text-lg"}>
+                  {isUp(usersWeeklyChange) ? "▲" : "▼"}
+                </span>
               </div>
+              <p className="text-xs text-muted-foreground">
+                {usersWeeklyChange > 0 ? "+" : ""}{usersWeeklyChange} this week
+              </p>
             </div>
-            <div className="flex-1 flex items-end"><TotalUsersChart /></div>
+            <div className="flex-1 flex items-end">
+              <UsersChart chartData={usersChart} />
+            </div>
           </div>
         </div>
 
@@ -112,16 +152,21 @@ export default function AnalyticsDashboard() {
         <div className="bg-white rounded-xl border border-border p-3 flex flex-col justify-between" style={{ minHeight: 180 }}>
           <p className="text-sm font-medium text-foreground mb-0.5 mt-4">New Users</p>
           <button className="flex items-center gap-1 text-xs text-muted-foreground mb-1 mt-2">
-            This week <ChevronDown size={11} />
+            This month <ChevronDown size={11} />
           </button>
           <div className="flex items-end gap-2 flex-1">
             <div className="flex flex-col justify-end">
               <div className="flex items-center gap-2 mb-2">
-                <p className="text-3xl font-bold text-foreground">28</p>
+                <p className="text-3xl font-bold text-foreground">
+                  {loading ? "..." : newUsers.toLocaleString()}
+                </p>
                 <span className="text-green-500 text-lg">▲</span>
               </div>
+              <p className="text-xs text-muted-foreground">since last month</p>
             </div>
-            <div className="flex-1 flex items-end"><SmoothWaveChart /></div>
+            <div className="flex-1 flex items-end">
+              <SmoothWaveChart chartData={usersChart} />
+            </div>
           </div>
         </div>
 
@@ -134,17 +179,28 @@ export default function AnalyticsDashboard() {
           <div className="flex items-end gap-2 flex-1">
             <div className="flex flex-col justify-end">
               <div className="flex items-center gap-2 mb-2">
-                <p className="text-3xl font-bold text-foreground">108</p>
-                <span className="text-green-500 text-lg">▲</span>
+                <p className="text-3xl font-bold text-foreground">
+                  {loading ? "..." : totalUploads.toLocaleString()}
+                </p>
+                <span className={isUp(uploadsWeeklyChange) ? "text-green-500 text-lg" : "text-red-500 text-lg"}>
+                  {isUp(uploadsWeeklyChange) ? "▲" : "▼"}
+                </span>
               </div>
+              <p className="text-xs text-muted-foreground">
+                {uploadsWeeklyChange > 0 ? "+" : ""}{uploadsWeeklyChange} this week
+              </p>
             </div>
-            <div className="flex-1 flex items-end"><SmoothWaveChart /></div>
+            <div className="flex-1 flex items-end">
+              <SmoothWaveChart chartData={uploadsChart} />
+            </div>
           </div>
         </div>
+
       </div>
 
-      {/* ── Row 3: Top Performing + Users donut ── */}
+      {/* ── Row 2: Top Performing + Users donut ── */}
       <div className="grid grid-cols-[1fr_380px] gap-4">
+
         {/* Top Performing card */}
         <div className="bg-white rounded-xl border border-border p-5">
           <div className="flex items-center justify-between mb-4">
@@ -181,56 +237,154 @@ export default function AnalyticsDashboard() {
             </button>
           </div>
 
-          {/* List */}
-          <div className="flex flex-col divide-y divide-border">
-            {topPerforming.map((item, i) => (
-              <div key={i} className="flex items-center gap-3 py-3">
-                {/* Product image - RESTORED YOUR IMAGE TAG HERE */}
-                <div className="w-10 h-10 rounded-lg shrink-0 overflow-hidden">
-                  <img
-                    src="/images/denim.png"
-                    alt={item.title}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">{item.title}</p>
-                  <p className="text-xs text-muted-foreground truncate">{item.subtitle}</p>
-                </div>
-                <p className="text-xs text-muted-foreground shrink-0">Posted by {item.poster}</p>
-              </div>
-            ))}
-          </div>
+          {/* Contents Tab */}
+          {topTab === "contents" && (
+            <div className="flex flex-col divide-y divide-border">
+              {topContent.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">No content found</p>
+              ) : (
+                topContent.map((item: any, i: number) => {
+  const isVideo = item.content_type === "video";
+  const isArticle = item.content_type === "article";
+  const isLivestream = item.content_type === "livestream";
+
+  const title = isVideo
+    ? item.caption
+    : isArticle
+    ? item.title
+    : item.name;
+
+  const subtitle = isVideo
+    ? `${item.view_count ?? 0} views · ${item.like_count ?? 0} likes`
+    : isArticle
+    ? item.summary
+    : `${item.active_participants_count ?? 0} participants`;
+
+  const image = isVideo || isArticle
+    ? item.thumbnail
+    : item.creator_image;
+
+  const poster = isVideo
+    ? item.tags || "—"
+    : isArticle
+    ? item.author_name
+    : item.creator_name;
+
+  const typeLabel: Record<string, string> = {
+    video: "Video",
+    article: "Article",
+    livestream: "Live",
+    influencer_content: "Influencer",
+  };
+
+  return (
+    <div key={i} className="flex items-center gap-3 py-3">
+      <div className="w-10 h-10 rounded-lg shrink-0 overflow-hidden bg-muted flex items-center justify-center">
+        {image ? (
+          <img src={image} alt={title} className="w-full h-full object-cover" />
+        ) : (
+          <span className="text-[10px] text-muted-foreground font-medium uppercase">
+            {typeLabel[item.content_type] ?? "—"}
+          </span>
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-foreground truncate">
+          {title || "Untitled"}
+        </p>
+        <p className="text-xs text-muted-foreground truncate">{subtitle}</p>
+      </div>
+      <div className="shrink-0 text-right">
+        <p className="text-xs text-muted-foreground truncate max-w-[80px]">
+          {isVideo ? item.tags || "—" : `By ${poster}`}
+        </p>
+        <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded">
+          {typeLabel[item.content_type] ?? "—"}
+        </span>
+      </div>
+    </div>
+  );
+})
+              )}
+            </div>
+          )}
+
+          {/* Sellers Tab */}
+          {topTab === "sellers" && (
+            <div className="flex flex-col divide-y divide-border">
+              {topSellers.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">No sellers found</p>
+              ) : (
+                topSellers.map((seller: any, i: number) => (
+                  <div key={i} className="flex items-center gap-3 py-3">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 shrink-0 flex items-center justify-center text-xs font-medium text-primary">
+                      {seller.first_name?.charAt(0).toUpperCase() ?? "?"}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {seller.business_name || `${seller.first_name} ${seller.last_name}`.trim() || seller.email}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {seller.product_count ?? 0} products · {seller.email}
+                      </p>
+                    </div>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                      seller.status === "active"
+                        ? "bg-green-50 text-green-700"
+                        : "bg-gray-50 text-gray-500"
+                    }`}>
+                      {seller.status}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
         </div>
 
         {/* Users donut chart card */}
         <div className="bg-white rounded-xl border border-border p-5">
           <div className="flex items-center justify-between mb-4">
-            <p className="text-sm font-semibold text-foreground">Users</p>
+            <p className="text-sm font-semibold text-foreground">
+              Users {!loading && `(${totalUsersCount.toLocaleString()})`}
+            </p>
             <button className="flex items-center gap-1 text-xs text-muted-foreground border border-border rounded px-2 py-1">
               This Month <ChevronDown size={11} />
             </button>
           </div>
           <div className="flex justify-center my-2">
-            <DonutChart />
+            <DonutChart
+              customersPercent={customersPercent}
+              sellersPercent={sellersPercent}
+            />
           </div>
           <div className="flex flex-col gap-3 mt-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-sm bg-primary" />
-                <span className="text-sm text-muted-foreground">General Users</span>
+                <span className="text-sm text-muted-foreground">
+                  General Users {!loading && `(${customersCount})`}
+                </span>
               </div>
-              <span className="text-sm font-semibold text-foreground">65.8%</span>
+              <span className="text-sm font-semibold text-foreground">
+                {customersPercent.toFixed(1)}%
+              </span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-sm bg-pink-500" />
-                <span className="text-sm text-muted-foreground">Sellers</span>
+                <span className="text-sm text-muted-foreground">
+                  Sellers {!loading && `(${sellersCount})`}
+                </span>
               </div>
-              <span className="text-sm font-semibold text-foreground">20.5%</span>
+              <span className="text-sm font-semibold text-foreground">
+                {sellersPercent.toFixed(1)}%
+              </span>
             </div>
           </div>
         </div>
+
       </div>
     </div>
   );

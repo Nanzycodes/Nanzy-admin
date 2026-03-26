@@ -1,16 +1,27 @@
+"use client";
+
 import React from "react";
 import Image from "next/image";
 import { contentMiniImg } from "@/lib/utils";
 
-const Contents = () => {
-  const overviewRow = Array(4).fill(0);
+interface ContentsProps {
+  data?: any[] | null;
+}
+
+const Contents = ({ data }: ContentsProps) => {
+  // Only map if data exists, otherwise show empty state or null
+  if (!data) return null;
 
   return (
-    <div className="w-full h-[-webkit-fill-available] flex flex-col gap-6 py-6.5">
-      {overviewRow.map((_, i) => (
-        <div key={i} className="w-full">
-          <ContentItem />
-        </div>
+    <div className="w-full flex flex-col gap-6 py-4">
+      {data.map((item: any, i: number) => (
+        <ContentItem
+          key={item.id || i}
+          title={item?.title}
+          subtitle={`${item?.views_count ?? 0} views · ${item?.content_type ?? ""}`}
+          poster={item?.owner_name}
+          image={null}
+        />
       ))}
     </div>
   );
@@ -18,24 +29,35 @@ const Contents = () => {
 
 export default Contents;
 
-export const ContentItem = ({ classname }: { classname?: string }) => {
+export const ContentItem = ({
+  title,
+  subtitle,
+  poster,
+  image,
+  classname,
+}: {
+  title?: string;
+  subtitle?: string;
+  poster?: string;
+  image?: string | null;
+  classname?: string;
+}) => {
   return (
-    <div
-      className={`w-full flex justify-between items-center ${classname} pb-2.5 `}
-    >
-      <div className="flex items-center gap-2.5 sm:gap-4.5">
-        <Image src={contentMiniImg} alt="home-alt" />
+    <div className={`w-full flex justify-between items-center pb-2.5 ${classname}`}>
+      <div className="flex items-center gap-2.5 sm:gap-4">
+        <div className="w-10 h-10 rounded-lg shrink-0 overflow-hidden flex items-center justify-center">
+          {image ? (
+            <img src={image} alt={title} className="w-full h-full object-cover" />
+          ) : (
+            <Image src={contentMiniImg} alt="content" width={40} height={40} className="object-cover" />
+          )}
+        </div>
         <div className="min-w-0">
-          <h3 className="text-sm sm:text-base font-medium mb-1 truncate">
-            The best hand made Denims
-          </h3>
-          <p className="text-[#9E9E9E] text-xs truncate">
-            The best handmade Denims you can find in Lagos
-          </p>
+          <h3 className="text-sm sm:text-base font-medium mb-1 truncate">{title}</h3>
+          <p className="text-[#9E9E9E] text-xs truncate">{subtitle}</p>
         </div>
       </div>
-
-      <span className=" text-sm ">Posted by Olamade</span>
+      <span className="text-sm shrink-0">Posted by {poster}</span>
     </div>
   );
 };

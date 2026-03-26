@@ -6,17 +6,20 @@ import { BoxTrendUp } from "@/lib/utils";
 import Contents from "./contents";
 import Sellers from "./sellers";
 
-const PerformanceCard = ({ className = "" }: { className?: string }) => {
+const PerformanceCard = ({ className = "", topPerformers }: { 
+  className?: string;
+  topPerformers?: any;
+}) => {
   return (
     <DashboardCardContainer cardTitle="Top Performing" titleIcon={BoxTrendUp} className={className}>
-      <PerformanceTabs />
+      <PerformanceTabs topPerformers={topPerformers} />
     </DashboardCardContainer>
   );
 };
 
 export default PerformanceCard;
 
-export const PerformanceTabs = () => {
+export const PerformanceTabs = ({ topPerformers }: { topPerformers?: any }) => {
   const [activeTab, setActiveTab] = useState<"contents" | "sellers">("contents");
 
   return (
@@ -34,8 +37,12 @@ export const PerformanceTabs = () => {
         ))}
       </div>
       <div className="flex-1">
-        {activeTab === "contents" && <Contents />}
-        {activeTab === "sellers" && <Sellers />}
+        {activeTab === "contents" && (
+          <Contents data={topPerformers?.content ?? null} />
+        )}
+        {activeTab === "sellers" && (
+          <Sellers data={topPerformers?.sellers ?? null} />
+        )}
       </div>
     </div>
   );
