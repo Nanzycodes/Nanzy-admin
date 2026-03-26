@@ -1,15 +1,20 @@
-export type OrderStatus = "PENDING" | "IN_TRANSIT" | "DELIVERED" | "REJECTED" | "CANCELLED" | "PAID" | "SHIPPED";
+// types/order.ts
 
+// ── API status values (from backend) ──
+export type OrderStatus = "PENDING" | "PAID" | "SHIPPED" | "IN_TRANSIT" | "DELIVERED" | "REJECTED" | "CANCELLED";
+
+// ── Used for display labels and badge colors ──
 export const STATUS_LABELS: Record<OrderStatus, string> = {
   PENDING: "Pending",
+  PAID: "Paid",
+  SHIPPED: "Shipped",
   IN_TRANSIT: "In-transit",
   DELIVERED: "Delivered",
   REJECTED: "Rejected",
   CANCELLED: "Cancelled",
-  PAID: "Paid",
-  SHIPPED: "Shipped",
 };
 
+// ── Single item inside an order (from detail endpoint) ──
 export interface OrderItem {
   id: string;
   name: string;
@@ -18,6 +23,7 @@ export interface OrderItem {
   image?: string;
 }
 
+// ── Order as returned by GET /api/v1/admin/orders/ (list) ──
 export interface Order {
   id: string;
   customer: string;
@@ -29,6 +35,7 @@ export interface Order {
   updated_at: string;
 }
 
+// ── Order as returned by GET /api/v1/admin/orders/{id}/ (detail) ──
 export interface OrderDetail {
   id: string;
   customer: string;
@@ -43,7 +50,7 @@ export interface OrderDetail {
   escrow_reference: string;
   delivery_confirmed_at: string;
   delivery_confirmed_by: string;
-  items_count: string;
+  items_count: number;
   is_escrow_active: boolean;
   tracking_number: string;
   carrier_name: string;
@@ -57,6 +64,7 @@ export interface OrderDetail {
   updated_at: string;
 }
 
+// ── Paginated API response wrapper ──
 export interface PaginatedOrders {
   count: number;
   next: string | null;
