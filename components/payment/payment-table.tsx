@@ -1,43 +1,48 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Search, ListFilter, Calendar, ChevronDown, X, Loader2, MoreHorizontal } from "lucide-react";
-import { Payout, PayoutStatus } from "@/types/payout";
+import {
+  Search,
+  ListFilter,
+  Calendar,
+  ChevronDown,
+  X,
+  Loader2,
+  MoreHorizontal,
+} from "lucide-react";
+import {
+  Transaction,
+  TransactionStatus,
+  TRANSACTION_STATUS_LABEL,
+  formatTransactionType,
+} from "@/types/payout";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import apiClient from "@/lib/apiclient";
 
-type PayoutRole = "seller" | "influencer" | "delivery_partner";
-
 interface PaymentTableProps {
-  role: PayoutRole;
-  onViewDetails: (payout: Payout) => void;
+  onViewDetails: (transaction: Transaction) => void;
 }
 
-const FILTER_STATUSES: { label: string; value: PayoutStatus }[] = [
-  { label: "Paid", value: "PAID" },
-  { label: "Failed", value: "FAILED" },
+const FILTER_STATUSES: { label: string; value: TransactionStatus }[] = [
+  { label: "Paid", value: "COMPLETED" },
   { label: "Pending", value: "PENDING" },
+  { label: "Failed", value: "FAILED" },
+  { label: "Cancelled", value: "CANCELLED" },
 ];
-
-const ID_LABEL: Record<PayoutRole, string> = {
-  seller: "Seller ID",
-  influencer: "Influencer ID",
-  delivery_partner: "Partner ID",
-};
 
 const ITEMS_PER_PAGE = 7;
 
-export default function PaymentTable({ role, onViewDetails }: PaymentTableProps) {
+export default function PaymentTable({ onViewDetails }: PaymentTableProps) {
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [payouts, setPayouts] = useState<Payout[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [filterStatus, setFilterStatus] = useState<PayoutStatus | null>(null);
+  const [filterStatus, setFilterStatus] = useState<TransactionStatus | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
 
@@ -64,43 +69,37 @@ export default function PaymentTable({ role, onViewDetails }: PaymentTableProps)
   useEffect(() => {
     setCurrentPage(1);
     setSelectedRows(new Set());
-  }, [role, search, filterStatus, dateFrom, dateTo]);
+  }, [search, filterStatus, dateFrom, dateTo]);
 
   useEffect(() => {
-    async function fetchPayouts() {
+    async function fetchTransactions() {
       setLoading(true);
       setError(null);
       try {
         const params = new URLSearchParams();
-        params.append("role", role);
         params.append("page", String(currentPage));
         params.append("page_size", String(ITEMS_PER_PAGE));
-        if (search) params.append("search", search);
-        if (filterStatus) params.append("status", filterStatus);
-        if (dateFrom) params.append("created_after", format(dateFrom, "yyyy-MM-dd"));
-        if (dateTo) params.append("created_before", format(dateTo, "yyyy-MM-dd"));
 
-        const response = await apiClient.get(`/admin/payouts/?${params.toString()}`);
-        const data = response.data;
+        const response = await apiClient.get(
+          `/admin/transactions/?${params.toString()}`
+        );
+        const payload = response.data?.data;
 
-        if (data?.data?.results) {
-          setPayouts(data.data.results);
-          setTotalCount(data.data.count);
-        } else if (Array.isArray(data)) {
-          setPayouts(data);
-          setTotalCount(data.length);
+        if (payload?.results) {
+          setTransactions(payload.results);
+          setTotalCount(payload.count);
         } else {
-          setPayouts([]);
+          setTransactions([]);
           setTotalCount(0);
         }
       } catch {
-        setError("Failed to load payouts. Please try again.");
+        setError("Failed to load transactions. Please try again.");
       } finally {
         setLoading(false);
       }
     }
-    fetchPayouts();
-  }, [role, currentPage, search, filterStatus, dateFrom, dateTo]);
+    fetchTransactions();
+  }, [currentPage, search, filterStatus, dateFrom, dateTo]);
 
   const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE));
 
@@ -129,14 +128,12 @@ export default function PaymentTable({ role, onViewDetails }: PaymentTableProps)
   }
 
   function toggleAll() {
-    if (selectedRows.size === payouts.length) {
+    if (selectedRows.size === transactions.length) {
       setSelectedRows(new Set());
     } else {
-      setSelectedRows(new Set(payouts.map((p) => p.id)));
+      setSelectedRows(new Set(transactions.map((t) => t.id)));
     }
   }
-
-  const idLabel = ID_LABEL[role];
 
   return (
     <div className="bg-white rounded-xl border border-border">
@@ -144,11 +141,17 @@ export default function PaymentTable({ role, onViewDetails }: PaymentTableProps)
       <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
         {/* Search */}
         <div className="relative flex-1 max-w-[220px]">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none z-10" />
+          <Search
+            size={14}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none z-10"
+          />
           <input
             placeholder="Search"
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setCurrentPage(1);
+            }}
             className="w-full pl-8 pr-3 h-9 text-sm border border-border rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
           />
         </div>
@@ -165,7 +168,10 @@ export default function PaymentTable({ role, onViewDetails }: PaymentTableProps)
               : "Filter"}
             {filterStatus && (
               <span
-                onClick={(e) => { e.stopPropagation(); setFilterStatus(null); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setFilterStatus(null);
+                }}
                 className="ml-1 text-muted-foreground hover:text-foreground"
               >
                 <X size={12} />
@@ -177,8 +183,15 @@ export default function PaymentTable({ role, onViewDetails }: PaymentTableProps)
               {FILTER_STATUSES.map((s) => (
                 <button
                   key={s.value}
-                  onClick={() => { setFilterStatus(s.value); setFilterOpen(false); }}
-                  className={`w-full text-left px-3 py-1.5 text-sm hover:bg-muted transition-colors ${filterStatus === s.value ? "text-primary font-medium" : "text-foreground"}`}
+                  onClick={() => {
+                    setFilterStatus(s.value);
+                    setFilterOpen(false);
+                  }}
+                  className={`w-full text-left px-3 py-1.5 text-sm hover:bg-muted transition-colors ${
+                    filterStatus === s.value
+                      ? "text-primary font-medium"
+                      : "text-foreground"
+                  }`}
                 >
                   {s.label}
                 </button>
@@ -197,7 +210,12 @@ export default function PaymentTable({ role, onViewDetails }: PaymentTableProps)
             </button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start">
-            <CalendarComponent mode="single" selected={dateFrom} onSelect={setDateFrom} initialFocus />
+            <CalendarComponent
+              mode="single"
+              selected={dateFrom}
+              onSelect={setDateFrom}
+              initialFocus
+            />
           </PopoverContent>
         </Popover>
 
@@ -211,7 +229,12 @@ export default function PaymentTable({ role, onViewDetails }: PaymentTableProps)
             </button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start">
-            <CalendarComponent mode="single" selected={dateTo} onSelect={setDateTo} initialFocus />
+            <CalendarComponent
+              mode="single"
+              selected={dateTo}
+              onSelect={setDateTo}
+              initialFocus
+            />
           </PopoverContent>
         </Popover>
       </div>
@@ -224,17 +247,32 @@ export default function PaymentTable({ role, onViewDetails }: PaymentTableProps)
               <th className="w-10 px-4 py-3 text-left">
                 <input
                   type="checkbox"
-                  checked={payouts.length > 0 && selectedRows.size === payouts.length}
+                  checked={
+                    transactions.length > 0 &&
+                    selectedRows.size === transactions.length
+                  }
                   onChange={toggleAll}
                   className="rounded border-border"
                 />
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">{idLabel}</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Amount</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Payment method</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Requested on</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Status</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Actions</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
+                Wallet ID
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
+                Amount
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
+                Type
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
+                Requested on
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
+                Status
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -246,50 +284,78 @@ export default function PaymentTable({ role, onViewDetails }: PaymentTableProps)
               </tr>
             ) : error ? (
               <tr>
-                <td colSpan={7} className="px-4 py-12 text-center text-red-500 text-sm">{error}</td>
+                <td colSpan={7} className="px-4 py-12 text-center text-red-500 text-sm">
+                  {error}
+                </td>
               </tr>
-            ) : payouts.length === 0 ? (
+            ) : transactions.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground text-sm">No payouts found.</td>
+                <td
+                  colSpan={7}
+                  className="px-4 py-12 text-center text-muted-foreground text-sm"
+                >
+                  No transactions found.
+                </td>
               </tr>
             ) : (
-              payouts.map((payout) => {
+              transactions.map((tx) => {
                 const formattedDate = (() => {
-                  try { return format(new Date(payout.requested_on), "dd-MM-yyyy"); }
-                  catch { return payout.requested_on; }
+                  try {
+                    return format(new Date(tx.created_at), "dd-MM-yyyy");
+                  } catch {
+                    return tx.created_at;
+                  }
                 })();
+                const amount = parseFloat(tx.amount);
                 return (
-                  <tr key={payout.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
+                  <tr
+                    key={tx.id}
+                    className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
+                  >
                     <td className="px-4 py-3">
                       <input
                         type="checkbox"
-                        checked={selectedRows.has(payout.id)}
-                        onChange={() => toggleRow(payout.id)}
+                        checked={selectedRows.has(tx.id)}
+                        onChange={() => toggleRow(tx.id)}
                         className="rounded border-border"
                       />
                     </td>
                     <td className="px-4 py-3">
-                      <p className="font-medium text-foreground">{payout.name}</p>
-                      <p className="text-xs text-muted-foreground">#{payout.user_id}</p>
+                      <p className="font-medium text-foreground text-xs font-mono">
+                        {tx.wallet_id.slice(0, 8)}…
+                      </p>
+                      <p className="text-xs text-muted-foreground">#{tx.id.slice(0, 8)}</p>
                     </td>
-                    <td className="px-4 py-3 text-foreground">₦{payout.amount.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-foreground">{payout.payment_method}</td>
+                    <td className="px-4 py-3 text-foreground">
+                      ₦{isNaN(amount) ? tx.amount : amount.toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3 text-foreground">
+                      {formatTransactionType(tx.transaction_type)}
+                    </td>
                     <td className="px-4 py-3 text-foreground">{formattedDate}</td>
                     <td className="px-4 py-3">
-                      <PayoutStatusBadge status={payout.status} />
+                      <TransactionStatusBadge status={tx.status} />
                     </td>
                     <td className="px-4 py-3">
-                      <div className="relative inline-block" ref={openActionId === payout.id ? actionRef : null}>
+                      <div
+                        className="relative inline-block"
+                        ref={openActionId === tx.id ? actionRef : null}
+                      >
                         <button
-                          onClick={() => setOpenActionId(openActionId === payout.id ? null : payout.id)}
+                          onClick={() =>
+                            setOpenActionId(openActionId === tx.id ? null : tx.id)
+                          }
                           className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground"
                         >
                           <MoreHorizontal size={16} />
                         </button>
-                        {openActionId === payout.id && (
+                        {openActionId === tx.id && (
                           <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-border rounded-md shadow-lg py-1 min-w-[130px]">
                             <button
-                              onClick={() => { setOpenActionId(null); onViewDetails(payout); }}
+                              onClick={() => {
+                                setOpenActionId(null);
+                                onViewDetails(tx);
+                              }}
                               className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted transition-colors"
                             >
                               View details
@@ -321,15 +387,21 @@ export default function PaymentTable({ role, onViewDetails }: PaymentTableProps)
           </button>
           {getPageNumbers().map((page, i) =>
             page === "..." ? (
-              <span key={`ellipsis-${i}`} className="w-8 text-center text-sm text-muted-foreground">…</span>
+              <span
+                key={`ellipsis-${i}`}
+                className="w-8 text-center text-sm text-muted-foreground"
+              >
+                …
+              </span>
             ) : (
               <button
                 key={page}
                 onClick={() => setCurrentPage(page as number)}
                 className={`w-8 h-8 rounded text-sm font-medium transition-colors
-                  ${currentPage === page
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-muted border border-transparent hover:border-border"
+                  ${
+                    currentPage === page
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-muted border border-transparent hover:border-border"
                   }`}
               >
                 {page}
@@ -349,20 +421,18 @@ export default function PaymentTable({ role, onViewDetails }: PaymentTableProps)
   );
 }
 
-function PayoutStatusBadge({ status }: { status: PayoutStatus }) {
-  const styles: Record<PayoutStatus, string> = {
-    PAID: "bg-green-50 text-green-700 border-green-200",
-    FAILED: "bg-red-50 text-red-600 border-red-200",
+function TransactionStatusBadge({ status }: { status: TransactionStatus }) {
+  const styles: Record<TransactionStatus, string> = {
+    COMPLETED: "bg-green-50 text-green-700 border-green-200",
     PENDING: "bg-orange-50 text-orange-600 border-orange-200",
-  };
-  const labels: Record<PayoutStatus, string> = {
-    PAID: "Paid",
-    FAILED: "Failed",
-    PENDING: "Pending",
+    FAILED: "bg-red-50 text-red-600 border-red-200",
+    CANCELLED: "bg-red-50 text-red-600 border-red-200",
   };
   return (
-    <span className={`inline-flex items-center px-3 py-1 rounded-md text-xs font-medium border ${styles[status]}`}>
-      {labels[status]}
+    <span
+      className={`inline-flex items-center px-3 py-1 rounded-md text-xs font-medium border ${styles[status]}`}
+    >
+      {TRANSACTION_STATUS_LABEL[status]}
     </span>
   );
 }

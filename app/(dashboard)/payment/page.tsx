@@ -1,12 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import InnerLayout from "@/components/inner-layout";
 import PaymentTable from "@/components/payment/payment-table";
 import PayoutRequestModal from "@/components/payment/payout-request-modal";
-import { Payout } from "@/types/payout";
+import { Transaction } from "@/types/payout";
 import { TrendingUp, ChevronDown } from "lucide-react";
-import apiClient from "@/lib/apiclient";
 
 type PayoutRole = "seller" | "influencer" | "delivery_partner";
 
@@ -18,47 +17,18 @@ const TABS: { label: string; role: PayoutRole }[] = [
 
 export default function PaymentPage() {
   const [activeTab, setActiveTab] = useState<PayoutRole>("seller");
-  const [selectedPayout, setSelectedPayout] = useState<Payout | null>(null);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Stat counts
-  const [totalRevenue, setTotalRevenue] = useState(0);
-  const [processedPayouts, setProcessedPayouts] = useState(0);
-  const [failedTransactions, setFailedTransactions] = useState(0);
-
-  useEffect(() => {
-    async function fetchStats() {
-      try {
-        const [revenueRes, processedRes, failedRes] = await Promise.all([
-          apiClient.get(`/admin/payouts/stats/?type=revenue`),
-          apiClient.get(`/admin/payouts/stats/?type=processed`),
-          apiClient.get(`/admin/payouts/stats/?type=failed`),
-        ]);
-        setTotalRevenue(revenueRes.data?.total ?? revenueRes.data?.count ?? 0);
-        setProcessedPayouts(processedRes.data?.total ?? processedRes.data?.count ?? 0);
-        setFailedTransactions(failedRes.data?.total ?? failedRes.data?.count ?? 0);
-      } catch {
-        // silently fail — stats are informational
-      }
-    }
-    fetchStats();
-  }, []);
-
-  function handleViewDetails(payout: Payout) {
-    setSelectedPayout(payout);
+  function handleViewDetails(transaction: Transaction) {
+    setSelectedTransaction(transaction);
     setIsModalOpen(true);
-  }
-
-  function handleStatusChange(id: string, status: Payout["status"]) {
-    // Table will refetch on next interaction; just close the modal
-    setIsModalOpen(false);
-    setSelectedPayout(null);
   }
 
   return (
     <InnerLayout sectionHeader="Payment" sectionSubheader="Manage and process payouts">
       <div>
-        {/* Stat cards */}
+        {/* Stat cards — static until backend adds stats endpoints */}
         <div className="grid grid-cols-3 gap-4 mb-6">
           <StatCard
             icon={
@@ -71,7 +41,7 @@ export default function PaymentPage() {
               </div>
             }
             label="Total revenue"
-            value={`₦${totalRevenue.toLocaleString()}`}
+            value="—"
             trend="9%"
           />
           <StatCard
@@ -85,7 +55,7 @@ export default function PaymentPage() {
               </div>
             }
             label="Processed payouts"
-            value={processedPayouts.toLocaleString()}
+            value="—"
             trend="9%"
           />
           <StatCard
@@ -99,7 +69,7 @@ export default function PaymentPage() {
               </div>
             }
             label="Failed transactions"
-            value={failedTransactions.toLocaleString()}
+            value="—"
             trend="9%"
           />
         </div>
@@ -111,9 +81,10 @@ export default function PaymentPage() {
               key={tab.role}
               onClick={() => setActiveTab(tab.role)}
               className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px
-                ${activeTab === tab.role
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
+                ${
+                  activeTab === tab.role
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
                 }`}
             >
               {tab.label}
@@ -121,16 +92,18 @@ export default function PaymentPage() {
           ))}
         </div>
 
-        {/* Table */}
-        <PaymentTable role={activeTab} onViewDetails={handleViewDetails} />
+        {/* Table — tabs share same endpoint (no role filter in API yet) */}
+        <PaymentTable onViewDetails={handleViewDetails} />
 
-        {/* Payout modal */}
-        {selectedPayout && (
+        {/* Modal */}
+        {selectedTransaction && (
           <PayoutRequestModal
-            payout={selectedPayout}
+            transaction={selectedTransaction}
             isOpen={isModalOpen}
-            onClose={() => { setIsModalOpen(false); setSelectedPayout(null); }}
-            onStatusChange={handleStatusChange}
+            onClose={() => {
+              setIsModalOpen(false);
+              setSelectedTransaction(null);
+            }}
           />
         )}
       </div>
