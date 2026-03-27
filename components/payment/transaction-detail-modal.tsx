@@ -189,7 +189,7 @@ export default function TransactionDetailModal({
                   </div>
                 )}
 
-                {transaction.metadata?.order_id && (
+                {transaction.metadata?.order_id != null && (
                   <div className="col-span-2">
                     <p className="text-xs text-muted-foreground mb-1">Order ID</p>
                     <div className="flex items-center">
