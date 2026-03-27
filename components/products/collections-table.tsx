@@ -232,7 +232,7 @@ export default function CollectionsTable({ onViewDetails, onDelete, onContentTyp
             { label: "Active", value: "active" },
             { label: "Inactive", value: "inactive" },
           ]}
-          getFilterValue={(c) => (c.is_active ? "active" : "inactive")}
+          getFilterValue={(c) => (c.content_type === "livestream" && c.is_active ? "active" : "inactive")}
           emptyMessage={`No ${CONTENT_TYPE_LABELS[activeType].toLowerCase()} content found`}
         />
       )}
