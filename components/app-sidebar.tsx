@@ -33,6 +33,7 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 import { usePathname } from "next/navigation";
+import Link from "next/link";
 import { pearlyLogo } from "@/lib/utils";
 import { useEffect } from "react";
 import adminAuthApi, { AdminProfile } from "@/lib/auth";
@@ -114,10 +115,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild isActive={pathname === "/settings"}>
-              <a href="/settings" className="flex items-center gap-2">
+              <Link href="/settings" className="flex items-center gap-2">
                 <Settings className={`w-4.5 h-4.5 ${pathname === "/settings" ? "text-[#635BFF]" : ""}`} />
                 <span>Settings</span>
-              </a>
+              </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

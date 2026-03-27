@@ -48,7 +48,9 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
   const [transitCount, setTransitCount] = useState(0);
   const [deliveredCount, setDeliveredCount] = useState(0);
 
-  const [activePeriod, setActivePeriod] = useState<"week" | "day" | "month">("week");
+  const [totalOrdersPeriod, setTotalOrdersPeriod] = useState<"week" | "day" | "month">("week");
+  const [transitPeriod, setTransitPeriod] = useState<"week" | "day" | "month">("week");
+  const [deliveredPeriod, setDeliveredPeriod] = useState<"week" | "day" | "month">("week");
 
   const [filterStatus, setFilterStatus] = useState<OrderStatus | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -71,31 +73,24 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
     setCurrentPage(1);
   }, [activeTab, search, filterStatus, dateFrom, dateTo]);
 
-  // ── Fetch Stats ──
+  // ── Fetch Stats (each card fetches independently) ──
   useEffect(() => {
-    async function fetchCounts() {
-      try {
-        const [
-          totalRes,
-          transitRes,
-          deliveredRes
-        ] = await Promise.all([
-          apiClient.get(`/admin/orders/?period=${activePeriod}&page_size=1`),
-          apiClient.get(`/admin/orders/?search=IN_TRANSIT&period=${activePeriod}&page_size=1`),
-          apiClient.get(`/admin/orders/?search=DELIVERED&period=${activePeriod}&page_size=1`),
-        ]);
+    apiClient.get(`/admin/orders/?period=${totalOrdersPeriod}&page_size=1`)
+      .then((res) => setGlobalTotalOrders(res.data?.data?.count ?? res.data?.count ?? 0))
+      .catch(() => {});
+  }, [totalOrdersPeriod]);
 
-        const getCount = (res: any) => res.data?.data?.count ?? res.data?.count ?? 0;
+  useEffect(() => {
+    apiClient.get(`/admin/orders/?search=IN_TRANSIT&period=${transitPeriod}&page_size=1`)
+      .then((res) => setTransitCount(res.data?.data?.count ?? res.data?.count ?? 0))
+      .catch(() => {});
+  }, [transitPeriod]);
 
-        setGlobalTotalOrders(getCount(totalRes));
-        setTransitCount(getCount(transitRes));
-        setDeliveredCount(getCount(deliveredRes));
-      } catch {
-        // silently fail stats
-      }
-    }
-    fetchCounts();
-  }, [activePeriod]);
+  useEffect(() => {
+    apiClient.get(`/admin/orders/?search=DELIVERED&period=${deliveredPeriod}&page_size=1`)
+      .then((res) => setDeliveredCount(res.data?.data?.count ?? res.data?.count ?? 0))
+      .catch(() => {});
+  }, [deliveredPeriod]);
 
   // ── Fetch Table Data ──
   useEffect(() => {
@@ -107,10 +102,6 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
         params.append("page", String(currentPage));
         params.append("page_size", String(ITEMS_PER_PAGE));
         
-        if (activePeriod !== "all" as any) {
-          params.append("period", activePeriod);
-        }
-
         const searchParts = [];
         if (search) searchParts.push(search);
         if (filterStatus) searchParts.push(filterStatus);
@@ -146,7 +137,7 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
       }
     }
     fetchOrders();
-  }, [currentPage, activeTab, search, filterStatus, dateFrom, dateTo, activePeriod]);
+  }, [currentPage, activeTab, search, filterStatus, dateFrom, dateTo]);
 
   const totalPages = Math.max(1, Math.ceil(tableTotalCount / ITEMS_PER_PAGE));
 
@@ -182,8 +173,8 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
           label="Total orders"
           value={String(globalTotalOrders)}
           trend={`+${globalTotalOrders} new`}
-          activePeriod={activePeriod}
-          onPeriodChange={(val) => setActivePeriod(val as any)}
+          activePeriod={totalOrdersPeriod}
+          onPeriodChange={(val) => setTotalOrdersPeriod(val as any)}
         />
         <StatCard
           icon={
@@ -197,8 +188,8 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
           label="Orders in transit"
           value={String(transitCount)}
           trend={`+${transitCount} new`}
-          activePeriod={activePeriod}
-          onPeriodChange={(val) => setActivePeriod(val as any)}
+          activePeriod={transitPeriod}
+          onPeriodChange={(val) => setTransitPeriod(val as any)}
         />
         <StatCard
           icon={
@@ -213,8 +204,8 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
           label="Orders delivered"
           value={String(deliveredCount)}
           trend={`+${deliveredCount} new`}
-          activePeriod={activePeriod}
-          onPeriodChange={(val) => setActivePeriod(val as any)}
+          activePeriod={deliveredPeriod}
+          onPeriodChange={(val) => setDeliveredPeriod(val as any)}
         />
       </div>
 

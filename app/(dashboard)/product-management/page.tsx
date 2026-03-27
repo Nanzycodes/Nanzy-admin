@@ -129,12 +129,12 @@ const Page = () => {
                   : "border-transparent text-muted-foreground hover:text-foreground"}`}
             >
               {tab.label}
-              {tab.count !== undefined && (
+              {/* {tab.count !== undefined && (
                 <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded text-xs font-semibold
                   ${activeTab === tab.value ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
                   {tab.count}
                 </span>
-              )}
+              )} */}
             </button>
           ))}
         </div>

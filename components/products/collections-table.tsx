@@ -228,6 +228,11 @@ export default function CollectionsTable({ onViewDetails, onDelete, onContentTyp
             const d = new Date(c.created_at);
             return isNaN(d.getTime()) ? null : d;
           }}
+          filterOptions={[
+            { label: "Active", value: "active" },
+            { label: "Inactive", value: "inactive" },
+          ]}
+          getFilterValue={(c) => (c.is_active ? "active" : "inactive")}
           emptyMessage={`No ${CONTENT_TYPE_LABELS[activeType].toLowerCase()} content found`}
         />
       )}

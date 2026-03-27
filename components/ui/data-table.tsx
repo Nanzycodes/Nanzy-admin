@@ -1,7 +1,14 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Search, SlidersHorizontal, ArrowUpRight, Calendar, ChevronDown } from "lucide-react";
+import {
+  Search,
+  ListFilter,
+  ArrowUpRight,
+  Calendar,
+  ChevronDown,
+  X,
+} from "lucide-react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 
@@ -14,11 +21,18 @@ export interface ColumnDef<T> {
   cell: (row: T) => React.ReactNode;
 }
 
+export interface FilterOption {
+  label: string;
+  value: string;
+}
+
 interface DataTableProps<T> {
   data: T[];
   columns: ColumnDef<T>[];
   getSearchText: (item: T) => string;
   getDate?: (item: T) => Date | null;
+  filterOptions?: FilterOption[];
+  getFilterValue?: (item: T) => string;
   toolbarRight?: React.ReactNode;
   emptyMessage?: string;
   itemsPerPage?: number;
@@ -45,6 +59,8 @@ export default function DataTable<T>({
   columns,
   getSearchText,
   getDate,
+  filterOptions,
+  getFilterValue,
   toolbarRight,
   emptyMessage = "No results found",
   itemsPerPage = 5,
@@ -55,16 +71,30 @@ export default function DataTable<T>({
   const [toDate, setToDate] = useState<Date | null>(null);
   const [showFromPicker, setShowFromPicker] = useState(false);
   const [showToPicker, setShowToPicker] = useState(false);
+  const [filterValue, setFilterValue] = useState<string | null>(null);
+  const [filterOpen, setFilterOpen] = useState(false);
 
   const fromPickerRef = useRef<HTMLDivElement>(null);
   const toPickerRef = useRef<HTMLDivElement>(null);
+  const filterRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (fromPickerRef.current && !fromPickerRef.current.contains(event.target as Node))
+      if (
+        fromPickerRef.current &&
+        !fromPickerRef.current.contains(event.target as Node)
+      )
         setShowFromPicker(false);
-      if (toPickerRef.current && !toPickerRef.current.contains(event.target as Node))
+      if (
+        toPickerRef.current &&
+        !toPickerRef.current.contains(event.target as Node)
+      )
         setShowToPicker(false);
+      if (
+        filterRef.current &&
+        !filterRef.current.contains(event.target as Node)
+      )
+        setFilterOpen(false);
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -75,28 +105,39 @@ export default function DataTable<T>({
       .toLowerCase()
       .includes(search.toLowerCase());
 
-    if (!getDate) return matchesSearch;
+    const matchesFilter =
+      !filterValue || !getFilterValue
+        ? true
+        : getFilterValue(item) === filterValue;
+
+    if (!getDate) return matchesSearch && matchesFilter;
 
     const itemDate = getDate(item);
     let matchesFrom = true;
     let matchesTo = true;
 
     if (itemDate) {
-      if (fromDate instanceof Date) matchesFrom = itemDate.getTime() >= fromDate.getTime();
-      if (toDate instanceof Date) matchesTo = itemDate.getTime() <= toDate.getTime();
+      if (fromDate instanceof Date)
+        matchesFrom = itemDate.getTime() >= fromDate.getTime();
+      if (toDate instanceof Date)
+        matchesTo = itemDate.getTime() <= toDate.getTime();
     } else {
       matchesFrom = false;
       matchesTo = false;
     }
 
-    return matchesSearch && matchesFrom && matchesTo;
+    return matchesSearch && matchesFilter && matchesFrom && matchesTo;
   });
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
-  const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const paginated = filtered.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage,
+  );
 
   function getPageNumbers(): (number | "...")[] {
-    if (totalPages <= 5) return Array.from({ length: totalPages }, (_, i) => i + 1);
+    if (totalPages <= 5)
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
     return [1, 2, 3, "...", totalPages - 2, totalPages - 1, totalPages];
   }
 
@@ -109,30 +150,66 @@ export default function DataTable<T>({
     <div>
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-[#E6E6E6]">
-        <div className="relative flex-1 min-w-30 max-w-55">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9E9E9E]" />
-          <input
-            placeholder="Search"
-            value={search}
-            onChange={(e) => handleSearch(e.target.value)}
-            className="w-full pl-8 pr-3 h-9 text-sm border border-[#E6E6E6] rounded-[5px] bg-white text-[#212121] placeholder:text-[#9E9E9E] focus:outline-none focus:ring-1 focus:ring-[#635BFF]"
-          />
+        {/* Search + Filter — flex-1 (left half) */}
+        <div className="flex flex-1 items-center gap-2 min-w-0">
+          <div className="relative flex-[2] min-w-0">
+            <Search
+              size={14}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9E9E9E]"
+            />
+            <input
+              placeholder="Search"
+              value={search}
+              onChange={(e) => handleSearch(e.target.value)}
+              className="w-full pl-8 pr-3 h-9 text-sm border border-[#E6E6E6] rounded-[5px] bg-white text-[#212121] placeholder:text-[#9E9E9E] focus:outline-none focus:ring-1 focus:ring-[#635BFF]"
+            />
+          </div>
+
+          <div className="relative flex-[1]" ref={filterRef}>
+            <button
+              onClick={() => filterOptions && setFilterOpen((o) => !o)}
+              className="w-full h-9 flex items-center justify-center gap-2 rounded-[5px] border border-[#E6E6E6] bg-white cursor-pointer hover:bg-[#F5F5F5] transition-colors text-sm text-[#616161]"
+            >
+              <ListFilter size={15} className="text-[#616161]" />
+              {filterValue && filterOptions
+                ? filterOptions.find((o) => o.value === filterValue)?.label
+                : null}
+              {filterValue && (
+                <span
+                  onClick={(e) => { e.stopPropagation(); setFilterValue(null); }}
+                  className="hover:text-[#212121]"
+                >
+                  <X size={12} />
+                </span>
+              )}
+            </button>
+            {filterOpen && filterOptions && (
+              <div className="absolute left-0 top-full mt-1 z-20 bg-white border border-[#E6E6E6] rounded-md shadow-lg py-1 min-w-[150px]">
+                {filterOptions.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => { setFilterValue(opt.value); setFilterOpen(false); setCurrentPage(1); }}
+                    className={`w-full text-left px-3 py-1.5 text-sm hover:bg-[#F5F5F5] transition-colors capitalize ${
+                      filterValue === opt.value ? "text-[#635BFF] font-medium" : "text-[#424242]"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
-        <button className="w-9 h-9 flex items-center justify-center rounded-[5px] border border-[#E6E6E6] bg-white cursor-pointer hover:bg-[#F5F5F5] transition-colors">
-          <SlidersHorizontal size={15} className="text-[#616161]" />
-        </button>
-
-        <button className="w-9 h-9 flex items-center justify-center rounded-[5px] border border-[#E6E6E6] bg-white cursor-pointer hover:bg-[#F5F5F5] transition-colors">
-          <ArrowUpRight size={15} className="text-[#616161]" />
-        </button>
+        {/* Dates + toolbar right — flex-1 (right half) */}
+        <div className="flex flex-1 items-center gap-2 justify-end">
 
         {/* Date From */}
         {getDate && (
-          <div ref={fromPickerRef} className="relative sm:ml-auto">
+          <div ref={fromPickerRef} className="relative flex-1">
             <button
               onClick={() => setShowFromPicker((v) => !v)}
-              className="flex items-center gap-2 text-sm text-[#616161] border border-[#E6E6E6] rounded-[5px] bg-white px-3 h-9 hover:bg-[#F5F5F5] transition-colors cursor-pointer"
+              className="w-full flex items-center justify-center gap-2 text-sm text-[#616161] border border-[#E6E6E6] rounded-[5px] bg-white px-3 h-9 hover:bg-[#F5F5F5] transition-colors cursor-pointer"
             >
               <Calendar size={13} />
               <span className="hidden sm:inline">Date from</span>
@@ -157,10 +234,10 @@ export default function DataTable<T>({
 
         {/* Date To */}
         {getDate && (
-          <div ref={toPickerRef} className="relative">
+          <div ref={toPickerRef} className="relative flex-1">
             <button
               onClick={() => setShowToPicker((v) => !v)}
-              className="flex items-center gap-2 text-sm text-[#616161] border border-[#E6E6E6] rounded-[5px] bg-white px-3 h-9 hover:bg-[#F5F5F5] transition-colors cursor-pointer"
+              className="w-full flex items-center justify-center gap-2 text-sm text-[#616161] border border-[#E6E6E6] rounded-[5px] bg-white px-3 h-9 hover:bg-[#F5F5F5] transition-colors cursor-pointer"
             >
               <Calendar size={13} />
               <span className="hidden sm:inline">Date to</span>
@@ -183,7 +260,12 @@ export default function DataTable<T>({
           </div>
         )}
 
-        {toolbarRight && <div className="flex items-center gap-2 ml-auto sm:ml-0">{toolbarRight}</div>}
+        {toolbarRight && (
+          <div className="flex items-center gap-2">
+            {toolbarRight}
+          </div>
+        )}
+        </div>
       </div>
 
       {/* Table */}
@@ -207,7 +289,10 @@ export default function DataTable<T>({
           <tbody>
             {paginated.length === 0 ? (
               <tr>
-                <td colSpan={columns.length + 1} className="text-center py-12 text-muted-foreground">
+                <td
+                  colSpan={columns.length + 1}
+                  className="text-center py-12 text-muted-foreground"
+                >
                   {emptyMessage}
                 </td>
               </tr>
@@ -267,7 +352,7 @@ export default function DataTable<T>({
                 >
                   {page}
                 </button>
-              )
+              ),
             )}
           </div>
 

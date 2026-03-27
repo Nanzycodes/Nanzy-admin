@@ -109,6 +109,22 @@ export default function ExperienceTable({ onViewDetails, onDelete }: ExperienceT
         const d = new Date(e.created_at);
         return isNaN(d.getTime()) ? null : d;
       }}
+      filterOptions={[
+        { label: "Shortlet", value: "shortlet" },
+        { label: "Spa", value: "spa" },
+        { label: "Salon", value: "salon" },
+        { label: "Hotel", value: "hotel" },
+        { label: "Rental", value: "rental" },
+        { label: "Pharmacy", value: "pharmacy" },
+        { label: "Bakery", value: "bakery" },
+        { label: "Restaurant", value: "restaurant" },
+        { label: "Cafe", value: "cafe" },
+        { label: "Alcohol", value: "alcohol" },
+        { label: "Boat", value: "boat" },
+        { label: "Car", value: "car" },
+        { label: "Gift", value: "gift" },
+      ]}
+      getFilterValue={(e) => e.experience_type}
       emptyMessage="No experiences found"
     />
   );

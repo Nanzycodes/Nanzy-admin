@@ -58,8 +58,9 @@ export default function Header() {
   // };
 
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between px-8 py-4 sm:pr-10 border border-[#E6E6E6] rounded-[5px]">
+    <header className="flex h-16 shrink-0 items-center justify-between px-4 sm:px-8 py-4 sm:pr-10 border border-[#E6E6E6] rounded-[5px]">
       <div className="flex items-center gap-2">
+        <SidebarTrigger className="md:hidden" />
         {activeProject?.icon && (
           <activeProject.icon className={`w-4.5 h-4.5 `} fill="" />
         )}
@@ -74,9 +75,9 @@ export default function Header() {
           </div>
         )} */}
 
-        <div>
+        {/* <div>
           <Input placeholder="Search" className="w-50" />
-        </div>
+        </div> */}
         <div className="w-7.5 h-7.5 relative rounded-[5px] bg-[#F5F5F5] overflow-hidden flex justify-center items-center ">
           <Bell className="w-5 h-5 m-auto" fill="" />
         </div>

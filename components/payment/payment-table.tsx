@@ -161,89 +161,95 @@ export default function PaymentTable({ role }: PaymentTableProps) {
     <>
       <div className="bg-white rounded-xl border border-border">
         {/* Toolbar */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
-          <div className="relative flex-1 max-w-[220px]">
-            <Search
-              size={14}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none z-10"
-            />
-            <input
-              placeholder="Search"
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full pl-8 pr-3 h-9 text-sm border border-border rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-            />
-          </div>
+        <div className="flex flex-wrap items-center gap-3 px-4 py-3 border-b border-border">
+          {/* Search + Filter — left half */}
+          <div className="flex flex-1 items-center gap-2 min-w-0">
+            <div className="relative flex-[2] min-w-0">
+              <Search
+                size={14}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none z-10"
+              />
+              <input
+                placeholder="Search"
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full pl-8 pr-3 h-9 text-sm border border-border rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+            </div>
 
-          <div className="relative" ref={filterRef}>
-            <button
-              onClick={() => setFilterOpen((o) => !o)}
-              className="flex items-center gap-2 h-9 px-3 text-sm border border-border rounded-md hover:bg-muted transition-colors"
-            >
-              <ListFilter size={14} />
-              {filterStatus
-                ? FILTER_STATUSES.find((s) => s.value === filterStatus)?.label
-                : "Filter"}
-              {filterStatus && (
-                <span
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setFilterStatus(null);
-                  }}
-                  className="ml-1 text-muted-foreground hover:text-foreground"
-                >
-                  <X size={12} />
-                </span>
-              )}
-            </button>
-            {filterOpen && (
-              <div className="absolute left-0 top-full mt-1 z-20 bg-white border border-border rounded-md shadow-lg py-1 min-w-[140px]">
-                {FILTER_STATUSES.map((s) => (
-                  <button
-                    key={s.value}
-                    onClick={() => {
-                      setFilterStatus(s.value);
-                      setFilterOpen(false);
+            <div className="relative flex-[1]" ref={filterRef}>
+              <button
+                onClick={() => setFilterOpen((o) => !o)}
+                className="w-full flex items-center justify-center gap-2 h-9 px-3 text-sm border border-border rounded-md hover:bg-muted transition-colors"
+              >
+                <ListFilter size={14} />
+                {filterStatus
+                  ? FILTER_STATUSES.find((s) => s.value === filterStatus)?.label
+                  : "Filter"}
+                {filterStatus && (
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setFilterStatus(null);
                     }}
-                    className={`w-full text-left px-3 py-1.5 text-sm hover:bg-muted transition-colors ${
-                      filterStatus === s.value ? "text-primary font-medium" : "text-foreground"
-                    }`}
+                    className="ml-1 text-muted-foreground hover:text-foreground"
                   >
-                    {s.label}
-                  </button>
-                ))}
-              </div>
-            )}
+                    <X size={12} />
+                  </span>
+                )}
+              </button>
+              {filterOpen && (
+                <div className="absolute left-0 top-full mt-1 z-20 bg-white border border-border rounded-md shadow-lg py-1 min-w-[140px]">
+                  {FILTER_STATUSES.map((s) => (
+                    <button
+                      key={s.value}
+                      onClick={() => {
+                        setFilterStatus(s.value);
+                        setFilterOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-1.5 text-sm hover:bg-muted transition-colors ${
+                        filterStatus === s.value ? "text-primary font-medium" : "text-foreground"
+                      }`}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
-          <Popover>
-            <PopoverTrigger asChild>
-              <button className="flex items-center gap-2 h-9 px-3 text-sm border border-border rounded-md hover:bg-muted transition-colors">
-                <Calendar size={14} />
-                {dateFrom ? format(dateFrom, "dd/MM/yyyy") : "Date from"}
-                <ChevronDown size={12} />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <CalendarComponent mode="single" selected={dateFrom} onSelect={setDateFrom} initialFocus />
-            </PopoverContent>
-          </Popover>
+          {/* Dates — right half */}
+          <div className="flex flex-1 items-center gap-2">
+            <Popover>
+              <PopoverTrigger asChild>
+                <button className="flex-1 flex items-center justify-center gap-2 h-9 px-3 text-sm border border-border rounded-md hover:bg-muted transition-colors">
+                  <Calendar size={14} />
+                  {dateFrom ? format(dateFrom, "dd/MM/yyyy") : "Date from"}
+                  <ChevronDown size={12} />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <CalendarComponent mode="single" selected={dateFrom} onSelect={setDateFrom} initialFocus />
+              </PopoverContent>
+            </Popover>
 
-          <Popover>
-            <PopoverTrigger asChild>
-              <button className="flex items-center gap-2 h-9 px-3 text-sm border border-border rounded-md hover:bg-muted transition-colors">
-                <Calendar size={14} />
-                {dateTo ? format(dateTo, "dd/MM/yyyy") : "Date to"}
-                <ChevronDown size={12} />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <CalendarComponent mode="single" selected={dateTo} onSelect={setDateTo} initialFocus />
-            </PopoverContent>
-          </Popover>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button className="flex-1 flex items-center justify-center gap-2 h-9 px-3 text-sm border border-border rounded-md hover:bg-muted transition-colors">
+                  <Calendar size={14} />
+                  {dateTo ? format(dateTo, "dd/MM/yyyy") : "Date to"}
+                  <ChevronDown size={12} />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <CalendarComponent mode="single" selected={dateTo} onSelect={setDateTo} initialFocus />
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
 
         {/* Table */}

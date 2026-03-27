@@ -66,8 +66,11 @@ apiClient.interceptors.response.use(
         : null;
 
       if (!refreshToken) {
-        // No refresh token, clear everything and let the app handle redirect
+        // No refresh token — clear everything and redirect to sign-in immediately
         clearAuthTokens();
+        if (typeof window !== "undefined") {
+          window.location.href = "/sign-in";
+        }
         return Promise.reject(error);
       }
 
@@ -114,15 +117,21 @@ apiClient.interceptors.response.use(
 
           return apiClient(originalRequest);
         } else {
-          // Refresh failed, clear tokens
+          // Refresh failed, clear tokens and redirect
           clearAuthTokens();
           processQueue(error, null);
+          if (typeof window !== "undefined") {
+            window.location.href = "/sign-in";
+          }
           return Promise.reject(error);
         }
       } catch (refreshError) {
-        // Refresh request failed, clear tokens
+        // Refresh request failed, clear tokens and redirect
         clearAuthTokens();
         processQueue(refreshError, null);
+        if (typeof window !== "undefined") {
+          window.location.href = "/sign-in";
+        }
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

@@ -18,10 +18,18 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { useRouter } from "next/navigation";
+import adminAuthApi from "@/lib/auth";
 // import { getNameInitials } from "@workspace/ui/lib/helper";
 
 export function NavUser({ user }: { user: any }) {
   const { isMobile } = useSidebar();
+  const router = useRouter();
+
+  function handleSignOut() {
+    adminAuthApi.logout();
+    router.push("/sign-in");
+  }
 
   return (
     <SidebarMenu>
@@ -80,7 +88,7 @@ export function NavUser({ user }: { user: any }) {
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator className="my-4" />
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={handleSignOut}>
               <LogOut />
               Sign out
             </DropdownMenuItem>

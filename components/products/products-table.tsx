@@ -113,6 +113,11 @@ export default function ProductsTable({ onViewDetails, onDelete }: ProductsTable
         const d = new Date(p.created_at);
         return isNaN(d.getTime()) ? null : d;
       }}
+      filterOptions={[
+        { label: "In Stock", value: "in_stock" },
+        { label: "Out of Stock", value: "out_of_stock" },
+      ]}
+      getFilterValue={(p) => (p.inventory > 0 ? "in_stock" : "out_of_stock")}
       emptyMessage="No products found"
     />
   );
