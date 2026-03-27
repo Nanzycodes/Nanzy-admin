@@ -3,7 +3,6 @@
 import React from "react";
 import Image from "next/image";
 import { sellerMiniImg } from "@/lib/utils";
-import { ShoppingCart, Users } from "lucide-react";
 
 interface SellersProps {
   data?: any[] | null;
@@ -50,11 +49,11 @@ export const SellerItem = ({
       </div>
       <div className="flex items-center gap-3">
         <span className="flex items-center gap-1 text-sm text-muted-foreground">
-          <ShoppingCart size={14} /> {orders} Orders
+          <Image src="/images/shopping-cart.svg" alt="orders" width={14} height={14} /> {orders} Orders
         </span>
-        <span className="flex items-center gap-1 text-sm text-muted-foreground">
+        {/* <span className="flex items-center gap-1 text-sm text-muted-foreground">
           <Users size={14} />
-        </span>
+        </span> */}
       </div>
     </div>
   );

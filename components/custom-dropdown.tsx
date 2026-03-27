@@ -50,7 +50,7 @@ export default function CustomDropdown({
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className="flex items-center gap-1 p-3 text-xs rounded-[5px] bg-[#FFFFFF66]  border border-[#fffefb] transition-all"
+        className="flex items-center gap-1 p-3 text-xs rounded-[5px] bg-white border border-border hover:bg-muted transition-all"
       >
         {icon &&
           (typeof icon === "string" ||

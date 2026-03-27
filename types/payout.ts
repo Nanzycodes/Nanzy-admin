@@ -1,5 +1,72 @@
 export type TransactionStatus = "PENDING" | "COMPLETED" | "FAILED" | "CANCELLED";
 
+// Admin - Sellers
+export interface AdminSeller {
+  id: number;
+  user_id: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  status: string;
+  is_active: boolean;
+  date_joined: string;
+  phone_number: string;
+  address: string;
+  product_count: string;
+  business_name: string;
+}
+
+export interface PaginatedAdminSellerList {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: AdminSeller[];
+}
+
+// Admin - Influencers
+export interface AdminInfluencer {
+  id: number;
+  user_id: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  status: string;
+  is_active: boolean;
+  date_joined: string;
+  phone_number: string;
+  address: string;
+  instagram_username: string;
+  x_username: string;
+  facebook_username: string;
+  tiktok_username: string;
+}
+
+export interface PaginatedAdminInfluencerList {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: AdminInfluencer[];
+}
+
+export interface TransactionOverview {
+  timeframe: string;
+  period: {
+    current_start: string;
+    current_end: string;
+    previous_start: string;
+    previous_end: string;
+  };
+  total_revenue: {
+    amount: string;
+    growth_percentage: number;
+  };
+  processed_payout: {
+    amount: string;
+    growth_percentage: number;
+  };
+  failed_transactions: number;
+}
+
 export type TransactionType =
   | "DEPOSIT"
   | "WITHDRAWAL"

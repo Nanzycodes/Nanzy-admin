@@ -20,9 +20,18 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import apiClient from "@/lib/apiclient";
+import TransactionDetailModal from "./transaction-detail-modal";
+
+type PayoutRole = "seller" | "influencer" | "delivery_partner";
+
+const USER_TYPE_MAP: Record<PayoutRole, string> = {
+  seller: "seller",
+  influencer: "influencer",
+  delivery_partner: "delivery_partner",
+};
 
 interface PaymentTableProps {
-  onViewDetails: (transaction: Transaction) => void;
+  role: PayoutRole;
 }
 
 const FILTER_STATUSES: { label: string; value: TransactionStatus }[] = [
@@ -34,7 +43,7 @@ const FILTER_STATUSES: { label: string; value: TransactionStatus }[] = [
 
 const ITEMS_PER_PAGE = 7;
 
-export default function PaymentTable({ onViewDetails }: PaymentTableProps) {
+export default function PaymentTable({ role }: PaymentTableProps) {
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -53,6 +62,8 @@ export default function PaymentTable({ onViewDetails }: PaymentTableProps) {
   const [openActionId, setOpenActionId] = useState<string | null>(null);
   const actionRef = useRef<HTMLDivElement>(null);
 
+  const [detailTxId, setDetailTxId] = useState<string | null>(null);
+
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
@@ -69,7 +80,8 @@ export default function PaymentTable({ onViewDetails }: PaymentTableProps) {
   useEffect(() => {
     setCurrentPage(1);
     setSelectedRows(new Set());
-  }, [search, filterStatus, dateFrom, dateTo]);
+    setTransactions([]);
+  }, [role, search, filterStatus, dateFrom, dateTo]);
 
   useEffect(() => {
     async function fetchTransactions() {
@@ -79,10 +91,13 @@ export default function PaymentTable({ onViewDetails }: PaymentTableProps) {
         const params = new URLSearchParams();
         params.append("page", String(currentPage));
         params.append("page_size", String(ITEMS_PER_PAGE));
+        params.append("user_type", USER_TYPE_MAP[role]);
+        if (search) params.append("search", search);
+        if (filterStatus) params.append("status", filterStatus);
+        if (dateFrom) params.append("start_date", format(dateFrom, "yyyy-MM-dd"));
+        if (dateTo) params.append("end_date", format(dateTo, "yyyy-MM-dd"));
 
-        const response = await apiClient.get(
-          `/admin/transactions/?${params.toString()}`
-        );
+        const response = await apiClient.get(`/admin/transactions/?${params.toString()}`);
         const payload = response.data?.data;
 
         if (payload?.results) {
@@ -99,7 +114,7 @@ export default function PaymentTable({ onViewDetails }: PaymentTableProps) {
       }
     }
     fetchTransactions();
-  }, [currentPage, search, filterStatus, dateFrom, dateTo]);
+  }, [role, currentPage, search, filterStatus, dateFrom, dateTo]);
 
   const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE));
 
@@ -135,289 +150,269 @@ export default function PaymentTable({ onViewDetails }: PaymentTableProps) {
     }
   }
 
+  const idColumnLabel =
+    role === "seller"
+      ? "Seller ID"
+      : role === "influencer"
+      ? "Influencer ID"
+      : "Partner ID";
+
   return (
-    <div className="bg-white rounded-xl border border-border">
-      {/* Toolbar */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
-        {/* Search */}
-        <div className="relative flex-1 max-w-[220px]">
-          <Search
-            size={14}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none z-10"
-          />
-          <input
-            placeholder="Search"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="w-full pl-8 pr-3 h-9 text-sm border border-border rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-          />
-        </div>
+    <>
+      <div className="bg-white rounded-xl border border-border">
+        {/* Toolbar */}
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
+          <div className="relative flex-1 max-w-[220px]">
+            <Search
+              size={14}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none z-10"
+            />
+            <input
+              placeholder="Search"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full pl-8 pr-3 h-9 text-sm border border-border rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+          </div>
 
-        {/* Filter */}
-        <div className="relative" ref={filterRef}>
-          <button
-            onClick={() => setFilterOpen((o) => !o)}
-            className="flex items-center gap-2 h-9 px-3 text-sm border border-border rounded-md hover:bg-muted transition-colors"
-          >
-            <ListFilter size={14} />
-            {filterStatus
-              ? FILTER_STATUSES.find((s) => s.value === filterStatus)?.label
-              : "Filter"}
-            {filterStatus && (
-              <span
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setFilterStatus(null);
-                }}
-                className="ml-1 text-muted-foreground hover:text-foreground"
-              >
-                <X size={12} />
-              </span>
-            )}
-          </button>
-          {filterOpen && (
-            <div className="absolute left-0 top-full mt-1 z-20 bg-white border border-border rounded-md shadow-lg py-1 min-w-[140px]">
-              {FILTER_STATUSES.map((s) => (
-                <button
-                  key={s.value}
-                  onClick={() => {
-                    setFilterStatus(s.value);
-                    setFilterOpen(false);
+          <div className="relative" ref={filterRef}>
+            <button
+              onClick={() => setFilterOpen((o) => !o)}
+              className="flex items-center gap-2 h-9 px-3 text-sm border border-border rounded-md hover:bg-muted transition-colors"
+            >
+              <ListFilter size={14} />
+              {filterStatus
+                ? FILTER_STATUSES.find((s) => s.value === filterStatus)?.label
+                : "Filter"}
+              {filterStatus && (
+                <span
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setFilterStatus(null);
                   }}
-                  className={`w-full text-left px-3 py-1.5 text-sm hover:bg-muted transition-colors ${
-                    filterStatus === s.value
-                      ? "text-primary font-medium"
-                      : "text-foreground"
-                  }`}
+                  className="ml-1 text-muted-foreground hover:text-foreground"
                 >
-                  {s.label}
-                </button>
-              ))}
-            </div>
-          )}
+                  <X size={12} />
+                </span>
+              )}
+            </button>
+            {filterOpen && (
+              <div className="absolute left-0 top-full mt-1 z-20 bg-white border border-border rounded-md shadow-lg py-1 min-w-[140px]">
+                {FILTER_STATUSES.map((s) => (
+                  <button
+                    key={s.value}
+                    onClick={() => {
+                      setFilterStatus(s.value);
+                      setFilterOpen(false);
+                    }}
+                    className={`w-full text-left px-3 py-1.5 text-sm hover:bg-muted transition-colors ${
+                      filterStatus === s.value ? "text-primary font-medium" : "text-foreground"
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <Popover>
+            <PopoverTrigger asChild>
+              <button className="flex items-center gap-2 h-9 px-3 text-sm border border-border rounded-md hover:bg-muted transition-colors">
+                <Calendar size={14} />
+                {dateFrom ? format(dateFrom, "dd/MM/yyyy") : "Date from"}
+                <ChevronDown size={12} />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <CalendarComponent mode="single" selected={dateFrom} onSelect={setDateFrom} initialFocus />
+            </PopoverContent>
+          </Popover>
+
+          <Popover>
+            <PopoverTrigger asChild>
+              <button className="flex items-center gap-2 h-9 px-3 text-sm border border-border rounded-md hover:bg-muted transition-colors">
+                <Calendar size={14} />
+                {dateTo ? format(dateTo, "dd/MM/yyyy") : "Date to"}
+                <ChevronDown size={12} />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <CalendarComponent mode="single" selected={dateTo} onSelect={setDateTo} initialFocus />
+            </PopoverContent>
+          </Popover>
         </div>
 
-        {/* Date from */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <button className="flex items-center gap-2 h-9 px-3 text-sm border border-border rounded-md hover:bg-muted transition-colors">
-              <Calendar size={14} />
-              {dateFrom ? format(dateFrom, "dd/MM/yyyy") : "Date from"}
-              <ChevronDown size={12} />
-            </button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <CalendarComponent
-              mode="single"
-              selected={dateFrom}
-              onSelect={setDateFrom}
-              initialFocus
-            />
-          </PopoverContent>
-        </Popover>
-
-        {/* Date to */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <button className="flex items-center gap-2 h-9 px-3 text-sm border border-border rounded-md hover:bg-muted transition-colors">
-              <Calendar size={14} />
-              {dateTo ? format(dateTo, "dd/MM/yyyy") : "Date to"}
-              <ChevronDown size={12} />
-            </button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <CalendarComponent
-              mode="single"
-              selected={dateTo}
-              onSelect={setDateTo}
-              initialFocus
-            />
-          </PopoverContent>
-        </Popover>
-      </div>
-
-      {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border">
-              <th className="w-10 px-4 py-3 text-left">
-                <input
-                  type="checkbox"
-                  checked={
-                    transactions.length > 0 &&
-                    selectedRows.size === transactions.length
-                  }
-                  onChange={toggleAll}
-                  className="rounded border-border"
-                />
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
-                Wallet ID
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
-                Amount
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
-                Type
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
-                Requested on
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
-                Status
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
-                  <Loader2 size={20} className="animate-spin mx-auto" />
-                </td>
+        {/* Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="w-10 px-4 py-3 text-left">
+                  <input
+                    type="checkbox"
+                    checked={transactions.length > 0 && selectedRows.size === transactions.length}
+                    onChange={toggleAll}
+                    className="rounded border-border"
+                  />
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
+                  {idColumnLabel}
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Amount</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Type</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Requested on</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Actions</th>
               </tr>
-            ) : error ? (
-              <tr>
-                <td colSpan={7} className="px-4 py-12 text-center text-red-500 text-sm">
-                  {error}
-                </td>
-              </tr>
-            ) : transactions.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={7}
-                  className="px-4 py-12 text-center text-muted-foreground text-sm"
-                >
-                  No transactions found.
-                </td>
-              </tr>
-            ) : (
-              transactions.map((tx) => {
-                const formattedDate = (() => {
-                  try {
-                    return format(new Date(tx.created_at), "dd-MM-yyyy");
-                  } catch {
-                    return tx.created_at;
-                  }
-                })();
-                const amount = parseFloat(tx.amount);
-                return (
-                  <tr
-                    key={tx.id}
-                    className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
-                  >
-                    <td className="px-4 py-3">
-                      <input
-                        type="checkbox"
-                        checked={selectedRows.has(tx.id)}
-                        onChange={() => toggleRow(tx.id)}
-                        className="rounded border-border"
-                      />
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-foreground text-xs font-mono">
-                        {tx.wallet_id.slice(0, 8)}…
-                      </p>
-                      <p className="text-xs text-muted-foreground">#{tx.id.slice(0, 8)}</p>
-                    </td>
-                    <td className="px-4 py-3 text-foreground">
-                      ₦{isNaN(amount) ? tx.amount : amount.toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3 text-foreground">
-                      {formatTransactionType(tx.transaction_type)}
-                    </td>
-                    <td className="px-4 py-3 text-foreground">{formattedDate}</td>
-                    <td className="px-4 py-3">
-                      <TransactionStatusBadge status={tx.status} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div
-                        className="relative inline-block"
-                        ref={openActionId === tx.id ? actionRef : null}
-                      >
-                        <button
-                          onClick={() =>
-                            setOpenActionId(openActionId === tx.id ? null : tx.id)
-                          }
-                          className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground"
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
+                    <Loader2 size={20} className="animate-spin mx-auto" />
+                  </td>
+                </tr>
+              ) : error ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-12 text-center text-red-500 text-sm">
+                    {error}
+                  </td>
+                </tr>
+              ) : transactions.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground text-sm">
+                    No transactions found.
+                  </td>
+                </tr>
+              ) : (
+                transactions.map((tx) => {
+                  const formattedDate = (() => {
+                    try {
+                      return format(new Date(tx.created_at), "dd-MM-yyyy");
+                    } catch {
+                      return tx.created_at;
+                    }
+                  })();
+                  const amount = parseFloat(tx.amount);
+                  return (
+                    <tr
+                      key={tx.id}
+                      className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
+                    >
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedRows.has(tx.id)}
+                          onChange={() => toggleRow(tx.id)}
+                          className="rounded border-border"
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-foreground text-xs font-mono">
+                          {tx.wallet_id.slice(0, 8)}…
+                        </p>
+                        <p className="text-xs text-muted-foreground">#{tx.id.slice(0, 8)}</p>
+                      </td>
+                      <td className="px-4 py-3 text-foreground">
+                        ₦{isNaN(amount) ? tx.amount : amount.toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3 text-foreground">
+                        {formatTransactionType(tx.transaction_type)}
+                      </td>
+                      <td className="px-4 py-3 text-foreground">{formattedDate}</td>
+                      <td className="px-4 py-3">
+                        <TransactionStatusBadge status={tx.status} />
+                      </td>
+                      <td className="px-4 py-3">
+                        <div
+                          className="relative inline-block"
+                          ref={openActionId === tx.id ? actionRef : null}
                         >
-                          <MoreHorizontal size={16} />
-                        </button>
-                        {openActionId === tx.id && (
-                          <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-border rounded-md shadow-lg py-1 min-w-[130px]">
-                            <button
-                              onClick={() => {
-                                setOpenActionId(null);
-                                onViewDetails(tx);
-                              }}
-                              className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted transition-colors"
-                            >
-                              View details
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+                          <button
+                            onClick={() =>
+                              setOpenActionId(openActionId === tx.id ? null : tx.id)
+                            }
+                            className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground"
+                          >
+                            <MoreHorizontal size={16} />
+                          </button>
+                          {openActionId === tx.id && (
+                            <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-border rounded-md shadow-lg py-1 min-w-[130px]">
+                              <button
+                                onClick={() => {
+                                  setOpenActionId(null);
+                                  setDetailTxId(tx.id);
+                                }}
+                                className="w-full text-left px-3 py-1.5 text-sm hover:bg-muted transition-colors"
+                              >
+                                View details
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
 
-      {/* Pagination */}
-      <div className="flex items-center justify-between px-4 py-3 border-t border-border">
-        <p className="text-xs text-muted-foreground">
-          Page {currentPage} of {totalPages}
-        </p>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
-            className="flex items-center gap-1 px-3 py-1 rounded border border-border hover:bg-muted transition-colors disabled:opacity-40 text-sm"
-          >
-            ← Previous
-          </button>
-          {getPageNumbers().map((page, i) =>
-            page === "..." ? (
-              <span
-                key={`ellipsis-${i}`}
-                className="w-8 text-center text-sm text-muted-foreground"
-              >
-                …
-              </span>
-            ) : (
-              <button
-                key={page}
-                onClick={() => setCurrentPage(page as number)}
-                className={`w-8 h-8 rounded text-sm font-medium transition-colors
-                  ${
+        {/* Pagination */}
+        <div className="flex items-center justify-between px-4 py-3 border-t border-border">
+          <p className="text-xs text-muted-foreground">
+            Page {currentPage} of {totalPages}
+          </p>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="flex items-center gap-1 px-3 py-1 rounded border border-border hover:bg-muted transition-colors disabled:opacity-40 text-sm"
+            >
+              ← Previous
+            </button>
+            {getPageNumbers().map((page, i) =>
+              page === "..." ? (
+                <span key={`ellipsis-${i}`} className="w-8 text-center text-sm text-muted-foreground">
+                  …
+                </span>
+              ) : (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page as number)}
+                  className={`w-8 h-8 rounded text-sm font-medium transition-colors ${
                     currentPage === page
                       ? "bg-primary text-primary-foreground"
                       : "text-muted-foreground hover:bg-muted border border-transparent hover:border-border"
                   }`}
-              >
-                {page}
-              </button>
-            )
-          )}
-          <button
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-            disabled={currentPage === totalPages}
-            className="flex items-center gap-1 px-3 py-1 rounded border border-border hover:bg-muted transition-colors disabled:opacity-40 text-sm"
-          >
-            Next →
-          </button>
+                >
+                  {page}
+                </button>
+              )
+            )}
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="flex items-center gap-1 px-3 py-1 rounded border border-border hover:bg-muted transition-colors disabled:opacity-40 text-sm"
+            >
+              Next →
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+
+      {detailTxId && (
+        <TransactionDetailModal
+          transactionId={detailTxId}
+          onClose={() => setDetailTxId(null)}
+        />
+      )}
+    </>
   );
 }
 
@@ -429,9 +424,7 @@ function TransactionStatusBadge({ status }: { status: TransactionStatus }) {
     CANCELLED: "bg-red-50 text-red-600 border-red-200",
   };
   return (
-    <span
-      className={`inline-flex items-center px-3 py-1 rounded-md text-xs font-medium border ${styles[status]}`}
-    >
+    <span className={`inline-flex items-center px-3 py-1 rounded-md text-xs font-medium border ${styles[status]}`}>
       {TRANSACTION_STATUS_LABEL[status]}
     </span>
   );

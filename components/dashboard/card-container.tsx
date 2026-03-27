@@ -26,7 +26,7 @@ function DashboardCardContainer({
   return (
     // Changed h-full to h-fit so it hugs the content
     // Removed flex flex-col unless you specifically need it for alignment
-    <div className={`px-4 py-3 bg-[#FFFFFF66] border border-[#fffefb] rounded-[5px] h-fit ${className}`}>
+    <div className={`px-4 py-3 bg-white border border-border rounded-[5px] h-fit ${className}`}>
       <div className="flex justify-between items-center mb-4">
         <div className="flex gap-x-2 items-center">
           <Image src={titleIcon} alt="icons" width={20} height={20} />
