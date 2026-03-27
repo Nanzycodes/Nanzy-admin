@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Search, ListFilter, Calendar, ChevronDown, TrendingUp, X, Loader2 } from "lucide-react";
+import { Search, ListFilter, Calendar, ChevronDown, TrendingUp, TrendingDown, X, Loader2 } from "lucide-react";
 import { Order, OrderStatus, OrderDetail, STATUS_LABELS } from "@/types/order";
 import {
   DropdownMenu,
@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { format, subDays } from "date-fns";
+import { format } from "date-fns";
 import apiClient from "@/lib/apiclient";
 
 interface OrdersTableProps {
@@ -43,15 +43,12 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Stats State
+  // ── Stats State ──
   const [globalTotalOrders, setGlobalTotalOrders] = useState(0);
-  const [totalTrend, setTotalTrend] = useState("0%");
-
   const [transitCount, setTransitCount] = useState(0);
-  const [transitTrend, setTransitTrend] = useState("0%");
-
   const [deliveredCount, setDeliveredCount] = useState(0);
-  const [deliveredTrend, setDeliveredTrend] = useState("0%");
+
+  const [activePeriod, setActivePeriod] = useState<"week" | "day" | "month">("week");
 
   const [filterStatus, setFilterStatus] = useState<OrderStatus | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -74,56 +71,33 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
     setCurrentPage(1);
   }, [activeTab, search, filterStatus, dateFrom, dateTo]);
 
-  // Fetch Stats & Trends
+  // ── Fetch Stats ──
   useEffect(() => {
     async function fetchCounts() {
       try {
-        const today = new Date();
-        const lastWeek = format(subDays(today, 7), "yyyy-MM-dd");
-        const twoWeeksAgo = format(subDays(today, 14), "yyyy-MM-dd");
-
         const [
-          totalRes, totalThisWeekRes, totalLastWeekRes,
-          transitRes, transitThisWeekRes, transitLastWeekRes,
-          deliveredRes, deliveredThisWeekRes, deliveredLastWeekRes
+          totalRes,
+          transitRes,
+          deliveredRes
         ] = await Promise.all([
-          apiClient.get(`/admin/orders/?page_size=1`),
-          apiClient.get(`/admin/orders/?created_after=${lastWeek}&page_size=1`),
-          apiClient.get(`/admin/orders/?created_after=${twoWeeksAgo}&created_before=${lastWeek}&page_size=1`),
-
-          apiClient.get(`/admin/orders/?status=IN_TRANSIT&page_size=1`),
-          apiClient.get(`/admin/orders/?status=IN_TRANSIT&created_after=${lastWeek}&page_size=1`),
-          apiClient.get(`/admin/orders/?status=IN_TRANSIT&created_after=${twoWeeksAgo}&created_before=${lastWeek}&page_size=1`),
-
-          apiClient.get(`/admin/orders/?status=DELIVERED&page_size=1`),
-          apiClient.get(`/admin/orders/?status=DELIVERED&created_after=${lastWeek}&page_size=1`),
-          apiClient.get(`/admin/orders/?status=DELIVERED&created_after=${twoWeeksAgo}&created_before=${lastWeek}&page_size=1`),
+          apiClient.get(`/admin/orders/?period=${activePeriod}&page_size=1`),
+          apiClient.get(`/admin/orders/?search=IN_TRANSIT&period=${activePeriod}&page_size=1`),
+          apiClient.get(`/admin/orders/?search=DELIVERED&period=${activePeriod}&page_size=1`),
         ]);
 
         const getCount = (res: any) => res.data?.data?.count ?? res.data?.count ?? 0;
 
-        const calcTrend = (current: number, previous: number) => {
-          if (previous === 0) return current > 0 ? "+100%" : "0%";
-          const percent = Math.round(((current - previous) / previous) * 100);
-          return `${percent > 0 ? "+" : ""}${percent}%`;
-        };
-
         setGlobalTotalOrders(getCount(totalRes));
-        setTotalTrend(calcTrend(getCount(totalThisWeekRes), getCount(totalLastWeekRes)));
-
         setTransitCount(getCount(transitRes));
-        setTransitTrend(calcTrend(getCount(transitThisWeekRes), getCount(transitLastWeekRes)));
-
         setDeliveredCount(getCount(deliveredRes));
-        setDeliveredTrend(calcTrend(getCount(deliveredThisWeekRes), getCount(deliveredLastWeekRes)));
       } catch {
         // silently fail stats
       }
     }
     fetchCounts();
-  }, []);
+  }, [activePeriod]);
 
-  // Fetch Table Data
+  // ── Fetch Table Data ──
   useEffect(() => {
     async function fetchOrders() {
       setLoading(true);
@@ -132,9 +106,20 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
         const params = new URLSearchParams();
         params.append("page", String(currentPage));
         params.append("page_size", String(ITEMS_PER_PAGE));
-        if (search) params.append("search", search);
-        if (filterStatus) params.append("status", filterStatus);
-        else if (activeTab !== "all") params.append("status", activeTab);
+        
+        if (activePeriod !== "all" as any) {
+          params.append("period", activePeriod);
+        }
+
+        const searchParts = [];
+        if (search) searchParts.push(search);
+        if (filterStatus) searchParts.push(filterStatus);
+        else if (activeTab !== "all") searchParts.push(activeTab);
+
+        if (searchParts.length > 0) {
+          params.append("search", searchParts.join(" "));
+        }
+
         if (dateFrom) params.append("created_after", format(dateFrom, "yyyy-MM-dd"));
         if (dateTo) params.append("created_before", format(dateTo, "yyyy-MM-dd"));
 
@@ -161,22 +146,7 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
       }
     }
     fetchOrders();
-  }, [currentPage, activeTab, search, filterStatus, dateFrom, dateTo]);
-
-  // SAFE API DETAIL PARSING
-  async function handleViewDetails(order: Order) {
-    if (!order?.id) {
-      alert("This order is missing an ID.");
-      return;
-    }
-    try {
-      const response = await apiClient.get(`/admin/orders/${order.id}/`);
-      const detailData = response.data?.data || response.data;
-      onViewDetails(detailData);
-    } catch {
-      alert("Could not load order details. Please try again.");
-    }
-  }
+  }, [currentPage, activeTab, search, filterStatus, dateFrom, dateTo, activePeriod]);
 
   const totalPages = Math.max(1, Math.ceil(tableTotalCount / ITEMS_PER_PAGE));
 
@@ -198,7 +168,7 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
 
   return (
     <div>
-      {/* ── Stat cards (YOUR EXACT UI) ── */}
+      {/* ── Stat cards with YOUR original SVG icons ── */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         <StatCard
           icon={
@@ -211,7 +181,9 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
           }
           label="Total orders"
           value={String(globalTotalOrders)}
-          trend={totalTrend}
+          trend={`+${globalTotalOrders} new`}
+          activePeriod={activePeriod}
+          onPeriodChange={(val) => setActivePeriod(val as any)}
         />
         <StatCard
           icon={
@@ -224,7 +196,9 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
           }
           label="Orders in transit"
           value={String(transitCount)}
-          trend={transitTrend}
+          trend={`+${transitCount} new`}
+          activePeriod={activePeriod}
+          onPeriodChange={(val) => setActivePeriod(val as any)}
         />
         <StatCard
           icon={
@@ -238,7 +212,9 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
           }
           label="Orders delivered"
           value={String(deliveredCount)}
-          trend={deliveredTrend}
+          trend={`+${deliveredCount} new`}
+          activePeriod={activePeriod}
+          onPeriodChange={(val) => setActivePeriod(val as any)}
         />
       </div>
 
@@ -387,7 +363,9 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
                         </div>
                         <div>
                           <p className="font-medium text-foreground leading-tight">{order.customer}</p>
-                          <p className="text-xs text-muted-foreground leading-tight">#{order.id}</p>
+                          <p className="text-xs text-muted-foreground leading-tight">
+                            #{order?.id ? String(order.id).split('-')[0].toUpperCase() : "—"}
+                          </p>
                         </div>
                       </div>
                     </td>
@@ -416,7 +394,7 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
                           </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-48">
-                          <DropdownMenuItem onClick={() => handleViewDetails(order)}>
+                          <DropdownMenuItem onClick={() => onViewDetails(order as any)}>
                             View Details
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -471,15 +449,41 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
   );
 }
 
-// EXACT ORIGINAL STATCARD UI RESTORED
-function StatCard({ icon, label, value, trend }: { icon: React.ReactNode; label: string; value: string; trend: string }) {
+// ── EXACT UI RESTORED + DROPDOWN ──
+function StatCard({ 
+  icon, 
+  label, 
+  value, 
+  trend, 
+  activePeriod, 
+  onPeriodChange 
+}: { 
+  icon: React.ReactNode; 
+  label: string; 
+  value: string; 
+  trend: string;
+  activePeriod: string;
+  onPeriodChange: (val: string) => void;
+}) {
   return (
     <div className="bg-white rounded-xl border border-border p-4">
       <div className="flex items-center justify-between mb-3">
         <div>{icon}</div>
-        <button className="flex items-center gap-1 text-xs text-muted-foreground border border-border rounded px-2 py-1">
-          This Week <ChevronDown size={11} />
-        </button>
+        
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="flex items-center gap-1 text-xs text-muted-foreground border border-border rounded px-2 py-1 hover:bg-muted transition-colors">
+              {activePeriod === "day" ? "Today" : activePeriod === "week" ? "This Week" : "This Month"} 
+              <ChevronDown size={11} />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-32">
+            <DropdownMenuItem onClick={() => onPeriodChange("day")}>Today</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onPeriodChange("week")}>This Week</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onPeriodChange("month")}>This Month</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
       </div>
       <p className="text-sm text-muted-foreground mb-1">{label}</p>
       <div className="flex items-end justify-between mt-2">
