@@ -17,6 +17,7 @@ export function NavMain({
     title: string;
     url: string;
     icon?: LucideIcon | React.ComponentType<{ className?: string }>;
+    inactiveIcon?: React.ComponentType<{ className?: string }>;
   }[];
 }) {
   const pathname = usePathname();
@@ -26,14 +27,14 @@ export function NavMain({
       <SidebarMenu>
         {items.map((item) => {
           const isActive = pathname === item.url;
+          const Icon = isActive ? item.icon : (item.inactiveIcon ?? item.icon);
 
           return (
             <SidebarMenuItem key={item.title}>
               <SidebarMenuButton asChild isActive={isActive}>
                 <a href={item.url} className="flex items-center gap-2">
-                  {item.icon && (
-                    <item.icon
-                      // fill={isActive ? "#635BFF" : ""}
+                  {Icon && (
+                    <Icon
                       className={`w-4.5 h-4.5 ${isActive ? "text-[#635BFF]" : ""}`}
                     />
                   )}

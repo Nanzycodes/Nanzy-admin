@@ -12,10 +12,22 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 
-function ContentIcon({ className }: { className?: string }) {
+function ContentActiveIcon({ className }: { className?: string }) {
   return (
     <Image
       src="/images/content-icon.svg"
+      alt="Content"
+      width={18}
+      height={18}
+      className={className}
+    />
+  );
+}
+
+function ContentInactiveIcon({ className }: { className?: string }) {
+  return (
+    <Image
+      src="/images/content-non-active-icon.svg"
       alt="Content"
       width={18}
       height={18}
@@ -83,7 +95,8 @@ export const navData = {
     {
       title: "Content",
       url: "/content-management",
-      icon: ContentIcon,
+      icon: ContentActiveIcon,
+      inactiveIcon: ContentInactiveIcon,
     },
     {
       title: "Payments",
