@@ -1,6 +1,7 @@
 "use client";
 
 import { type LucideIcon } from "lucide-react";
+import type React from "react";
 import {
   SidebarGroup,
   SidebarMenu,
@@ -15,7 +16,7 @@ export function NavMain({
   items: {
     title: string;
     url: string;
-    icon?: LucideIcon;
+    icon?: LucideIcon | React.ComponentType<{ className?: string }>;
   }[];
 }) {
   const pathname = usePathname();

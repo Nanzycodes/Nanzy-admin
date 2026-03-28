@@ -173,7 +173,7 @@ export default function DataTable<T>({
               <ListFilter size={15} className="text-[#616161]" />
               {filterValue && filterOptions
                 ? filterOptions.find((o) => o.value === filterValue)?.label
-                : null}
+                : "Filter"}
               {filterValue && (
                 <span
                   onClick={(e) => { e.stopPropagation(); setFilterValue(null); }}

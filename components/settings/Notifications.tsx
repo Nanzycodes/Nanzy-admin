@@ -1,49 +1,59 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Search, AlignJustify, ArrowUpRight, Box } from "lucide-react";
-
-interface NotificationItem {
-  id: string;
-  message: string;
-  time: string;
-  read: boolean;
-}
-
-const MOCK_NOTIFICATIONS: NotificationItem[] = [
-  {
-    id: "1",
-    message: "Nim Storeshas failed logins attempt",
-    time: "5mins ago",
-    read: false,
-  },
-  {
-    id: "2",
-    message: "You just assigned an order to Speed los",
-    time: "5mins ago",
-    read: false,
-  },
-  {
-    id: "3",
-    message: "You just assigned an order to Speed los",
-    time: "5mins ago",
-    read: false,
-  },
-  {
-    id: "4",
-    message: "You just assigned an order to Speed los",
-    time: "5mins ago",
-    read: false,
-  },
-];
+import { formatDistanceToNow } from "date-fns";
+import notificationsApi, { Notification } from "@/lib/notifications-api";
 
 const Notifications = () => {
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [allRead, setAllRead] = useState(false);
+  const [markingAll, setMarkingAll] = useState(false);
 
-  const filtered = MOCK_NOTIFICATIONS.filter((n) =>
-    n.message.toLowerCase().includes(search.toLowerCase()),
+  const fetchNotifications = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await notificationsApi.list();
+      const payload = res.data as any;
+      const items = Array.isArray(payload) ? payload : (payload?.data ?? []);
+      setNotifications(items);
+    } catch {
+      // silently fail — keep empty list
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
+
+  const handleMarkAsRead = async (id: string) => {
+    try {
+      await notificationsApi.markAsRead(id);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)),
+      );
+    } catch {}
+  };
+
+  const handleMarkAllRead = async () => {
+    setMarkingAll(true);
+    try {
+      await notificationsApi.markAllRead();
+      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+    } catch {
+    } finally {
+      setMarkingAll(false);
+    }
+  };
+
+  const filtered = notifications.filter((n) =>
+    `${n.title} ${n.message}`.toLowerCase().includes(search.toLowerCase()),
   );
+
+  const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   return (
     <div className="flex flex-col gap-4">
@@ -62,30 +72,37 @@ const Notifications = () => {
           />
         </div>
 
-        <button className="w-9 h-9 flex items-center justify-center rounded-[5px] border border-[#E6E6E6] bg-white cursor-pointer hover:bg-[#F5F5F5] transition-colors">
+        {/* <button className="w-9 h-9 flex items-center justify-center rounded-[5px] border border-[#E6E6E6] bg-white cursor-pointer hover:bg-[#F5F5F5] transition-colors">
           <AlignJustify size={15} className="text-[#616161]" />
         </button>
 
         <button className="w-9 h-9 flex items-center justify-center rounded-[5px] border border-[#E6E6E6] bg-white cursor-pointer hover:bg-[#F5F5F5] transition-colors">
           <ArrowUpRight size={15} className="text-[#616161]" />
-        </button>
+        </button> */}
 
-        <label className="flex items-center gap-2 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={allRead}
-            onChange={(e) => setAllRead(e.target.checked)}
-            className="w-4 h-4 rounded border-[#E6E6E6] accent-[#635BFF] cursor-pointer"
-          />
-          <span className="text-sm font-medium text-[#212121]">
-            Mark all as read
-          </span>
-        </label>
+        {unreadCount > 0 && (
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={false}
+              onChange={handleMarkAllRead}
+              disabled={markingAll}
+              className="w-4 h-4 rounded border-[#E6E6E6] accent-[#635BFF] cursor-pointer"
+            />
+            <span className="text-sm font-medium text-[#212121] whitespace-nowrap">
+              Mark all as read{unreadCount > 0 ? ` (${unreadCount})` : ""}
+            </span>
+          </label>
+        )}
       </div>
 
       {/* List */}
       <div className="flex flex-col">
-        {filtered.length === 0 ? (
+        {loading ? (
+          <p className="py-12 text-center text-sm text-[#9E9E9E]">
+            Loading notifications…
+          </p>
+        ) : filtered.length === 0 ? (
           <p className="py-12 text-center text-sm text-[#9E9E9E]">
             No notifications
           </p>
@@ -93,7 +110,9 @@ const Notifications = () => {
           filtered.map((item) => (
             <div
               key={item.id}
-              className="flex items-center gap-4 py-5 border-b border-[#F5F5F5] last:border-0"
+              className={`flex items-center gap-4 py-5 border-b border-[#F5F5F5] last:border-0 ${
+                !item.is_read ? "bg-[#FAFAFE]" : ""
+              }`}
             >
               {/* Icon */}
               <div className="w-10 h-10 rounded-full bg-[#ECEBFF] flex items-center justify-center shrink-0">
@@ -101,17 +120,31 @@ const Notifications = () => {
               </div>
 
               {/* Text */}
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
+                {item.title && (
+                  <p className="text-xs font-semibold text-[#635BFF] mb-0.5 uppercase tracking-wide">
+                    {item.title}
+                  </p>
+                )}
                 <p className="text-sm font-medium text-[#212121]">
                   {item.message}
                 </p>
-                <p className="text-xs text-[#9E9E9E] mt-0.5">{item.time}</p>
+                <p className="text-xs text-[#9E9E9E] mt-0.5">
+                  {formatDistanceToNow(new Date(item.created_at), {
+                    addSuffix: true,
+                  })}
+                </p>
               </div>
 
               {/* Action */}
-              <button className="px-5 py-2 text-sm font-medium text-[#645CFF] rounded-lg border border-[] bg-[#ECEBFF] hover:bg-[#FAFAFE] transition-colors cursor-pointer whitespace-nowrap">
-                View details
-              </button>
+              {!item.is_read && (
+                <button
+                  onClick={() => handleMarkAsRead(item.id)}
+                  className="px-5 py-2 text-sm font-medium text-[#645CFF] rounded-lg border border-[] bg-[#ECEBFF] hover:bg-[#FAFAFE] transition-colors cursor-pointer whitespace-nowrap"
+                >
+                  Mark as read
+                </button>
+              )}
             </div>
           ))
         )}

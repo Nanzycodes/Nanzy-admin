@@ -9,6 +9,7 @@ import {
   ArrowUpRight,
   X,
   Mail,
+  UserRound,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -112,22 +113,36 @@ const UserRoles = () => {
       <div className="flex flex-col gap-2 min-w-30">
         <button
           onClick={() => setActiveRole("superAdmin")}
-          className={`px-4 py-2 rounded-[5px] text-sm font-medium text-left transition-colors cursor-pointer ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-[5px] text-sm font-medium text-left transition-colors cursor-pointer ${
             activeRole === "superAdmin"
               ? "bg-[#635BFF] text-white"
               : "bg-transparent text-[#9E9E9E]"
           }`}
         >
+          <span
+            className={`flex items-center justify-center w-6 h-6 rounded-full ${
+              activeRole === "superAdmin" ? "bg-white/20" : "bg-[#F0F0F0]"
+            }`}
+          >
+            <UserRound size={14} />
+          </span>
           Super Admin
         </button>
         <button
           onClick={() => setActiveRole("admin")}
-          className={`px-4 py-2 rounded-[5px] text-sm font-medium text-left transition-colors cursor-pointer ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-[5px] text-sm font-medium text-left transition-colors cursor-pointer ${
             activeRole === "admin"
               ? "bg-[#635BFF] text-white"
               : "bg-transparent text-[#9E9E9E]"
           }`}
         >
+          <span
+            className={`flex items-center justify-center w-6 h-6 rounded-full ${
+              activeRole === "admin" ? "bg-white/20" : "bg-[#F0F0F0]"
+            }`}
+          >
+            <UserRound size={14} />
+          </span>
           admin
         </button>
       </div>
@@ -145,12 +160,12 @@ const UserRoles = () => {
                 />
                 <Input placeholder="Search" className="pl-8" />
               </div>
-              <button className="w-9 h-9 flex items-center justify-center rounded-[5px] border border-[#E6E6E6] bg-white cursor-pointer hover:bg-[#F5F5F5] transition-colors">
+              {/* <button className="w-9 h-9 flex items-center justify-center rounded-[5px] border border-[#E6E6E6] bg-white cursor-pointer hover:bg-[#F5F5F5] transition-colors">
                 <SlidersHorizontal size={15} className="text-[#616161]" />
               </button>
               <button className="w-9 h-9 flex items-center justify-center rounded-[5px] border border-[#E6E6E6] bg-white cursor-pointer hover:bg-[#F5F5F5] transition-colors">
                 <ArrowUpRight size={15} className="text-[#616161]" />
-              </button>
+              </button> */}
 
               {/* Invite modal */}
               <Dialog

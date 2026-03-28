@@ -10,6 +10,19 @@ import {
   TrendingUp,
   Settings,
 } from "lucide-react";
+import Image from "next/image";
+
+function ContentIcon({ className }: { className?: string }) {
+  return (
+    <Image
+      src="/images/content-icon.svg"
+      alt="Content"
+      width={18}
+      height={18}
+      className={className}
+    />
+  );
+}
 // import {
 //   LayoutGrid,
 //   SquareUser,
@@ -66,6 +79,11 @@ export const navData = {
       title: "Products",
       url: "/product-management",
       icon: Archive,
+    },
+    {
+      title: "Content",
+      url: "/content-management",
+      icon: ContentIcon,
     },
     {
       title: "Payments",
