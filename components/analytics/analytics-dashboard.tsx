@@ -1,44 +1,150 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { fetchAnalytics, fetchCustomerMetrics, fetchTopContent, fetchTopSellers } from "@/lib/analytics";
 import { TrendingUp, ChevronDown, ArrowUpRight, Calendar } from "lucide-react";
 
-function UsersChart({ chartData }: { chartData: { count: number }[] }) {
+type Timeframe = "weekly" | "monthly" | "yearly";
+
+const TIMEFRAME_LABELS: Record<Timeframe, string> = {
+  weekly: "This week",
+  monthly: "This month",
+  yearly: "This year",
+};
+
+function buildSmoothPath(
+  pts: [number, number][],
+  w: number,
+  h: number,
+  close = false,
+): { line: string; area: string } {
+  if (pts.length < 2) return { line: "", area: "" };
+  let line = `M ${pts[0][0]},${pts[0][1]}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [x0, y0] = i > 0 ? pts[i - 1] : pts[0];
+    const [x1, y1] = pts[i];
+    const [x2, y2] = pts[i + 1];
+    const [x3, y3] = i < pts.length - 2 ? pts[i + 2] : pts[pts.length - 1];
+    const cp1x = x1 + (x2 - x0) / 6;
+    const cp1y = y1 + (y2 - y0) / 6;
+    const cp2x = x2 - (x3 - x1) / 6;
+    const cp2y = y2 - (y3 - y1) / 6;
+    line += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${x2},${y2}`;
+  }
+  const area = `${line} L ${pts[pts.length - 1][0]},${h} L ${pts[0][0]},${h} Z`;
+  return { line, area };
+}
+
+function LineChart({
+  chartData,
+  width,
+  height,
+  svgHeight,
+}: {
+  chartData: { count: number }[];
+  width: number;
+  height: number;
+  svgHeight: number;
+}) {
   if (!chartData || chartData.length === 0) return null;
   const counts = chartData.map((d) => d.count);
-  const max = Math.max(...counts, 1);
-  const width = 208;
-  const height = 120;
-  const points = counts.map((count, i) => {
-    const x = (i / (counts.length - 1)) * width;
-    const y = height - (count / max) * (height - 10) - 5;
-    return `${x},${y}`;
-  });
-  const pathD = `M ${points.join(" L ")}`;
+  const max = Math.max(...counts);
+  const TOP = height * 0.08;
+  const BOTTOM = height * 0.88;
+  const pts: [number, number][] = counts.map((count, i) => [
+    counts.length === 1 ? width / 2 : (i / (counts.length - 1)) * width,
+    max === 0 ? height * 0.55 : BOTTOM - (count / max) * (BOTTOM - TOP),
+  ]);
+  const { line, area } = buildSmoothPath(pts, width, height);
+  const gradId = `grad-${width}-${svgHeight}`;
   return (
-    <svg width="100%" height="120" viewBox={`0 0 ${width} ${height}`} fill="none">
-      <path d={pathD} stroke="#B2ADFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <svg width="100%" height={svgHeight} viewBox={`0 0 ${width} ${height}`} fill="none" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#635BFF" stopOpacity="0.18" />
+          <stop offset="100%" stopColor="#635BFF" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={area} fill={`url(#${gradId})`} />
+      <path d={line} stroke="#635BFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
 
-function SmoothWaveChart({ chartData }: { chartData: { count: number }[] }) {
-  if (!chartData || chartData.length === 0) return null;
-  const counts = chartData.map((d) => d.count);
-  const max = Math.max(...counts, 1);
-  const width = 150;
-  const height = 60;
-  const points = counts.map((count, i) => {
-    const x = (i / (counts.length - 1)) * width;
-    const y = height - (count / max) * (height - 10) - 5;
-    return `${x},${y}`;
-  });
-  const pathD = `M ${points.join(" L ")}`;
+function MetricCard({
+  label,
+  metricKey,
+  renderValue,
+  renderTrend,
+}: {
+  label: string;
+  metricKey: "users" | "uploads";
+  renderValue: (data: any) => string;
+  renderTrend: (data: any) => string;
+}) {
+  const [timeframe, setTimeframe] = useState<Timeframe>("weekly");
+  const [tfOpen, setTfOpen] = useState(false);
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setTfOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  useEffect(() => {
+    setLoading(true);
+    fetchAnalytics(timeframe)
+      .then((res) => setData(res?.[metricKey] ?? null))
+      .catch(() => setData(null))
+      .finally(() => setLoading(false));
+  }, [timeframe, metricKey]);
+
+  const chart = data?.chart ?? [];
+  const isUp = (val: number) => val >= 0;
+  const change = data?.weekly_change ?? 0;
+
   return (
-    <svg width="100%" height="60" viewBox={`0 0 ${width} ${height}`} fill="none">
-      <path d={pathD} stroke="#B2ADFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
+    <div ref={ref} className="bg-white rounded-xl border border-border px-4 py-3 flex flex-row items-center justify-between" style={{ minHeight: 120 }}>
+      <div className="flex flex-col justify-center shrink-0">
+        <p className="text-sm font-medium text-foreground mb-0.5">{label}</p>
+        <div className="relative mb-2">
+          <button
+            onClick={() => setTfOpen((v) => !v)}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {TIMEFRAME_LABELS[timeframe]} <ChevronDown size={11} />
+          </button>
+          {tfOpen && (
+            <div className="absolute top-6 left-0 z-50 bg-white border border-border rounded-md shadow-md w-36 py-1">
+              {(Object.keys(TIMEFRAME_LABELS) as Timeframe[]).map((tf) => (
+                <button
+                  key={tf}
+                  onClick={() => { setTimeframe(tf); setTfOpen(false); }}
+                  className={`w-full text-left px-3 py-2 text-xs hover:bg-muted transition-colors ${timeframe === tf ? "text-primary font-medium" : "text-foreground"}`}
+                >
+                  {TIMEFRAME_LABELS[tf]}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <p className="text-3xl font-bold text-foreground">{loading ? "..." : renderValue(data)}</p>
+          <span className={isUp(change) ? "text-green-500 text-lg" : "text-red-500 text-lg"}>
+            {isUp(change) ? "▲" : "▼"}
+          </span>
+        </div>
+        <p className="text-xs text-muted-foreground mt-1">{loading ? "" : renderTrend(data)}</p>
+      </div>
+      <div className="flex-1 min-w-0 h-22.5 ml-4 overflow-hidden">
+        <LineChart chartData={chart} width={220} height={90} svgHeight={90} />
+      </div>
+    </div>
   );
 }
 
@@ -90,6 +196,7 @@ export default function AnalyticsDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setLoading(true);
     Promise.all([
       fetchAnalytics().catch(() => null),
       fetchCustomerMetrics().catch(() => null),
@@ -102,13 +209,6 @@ export default function AnalyticsDashboard() {
       setTopSellers(sellersData);
     }).finally(() => setLoading(false));
   }, []);
-
-  const totalUsers = analytics?.users?.total ?? 0;
-  const usersWeeklyChange = analytics?.users?.weekly_change ?? 0;
-  const usersChart = analytics?.users?.chart ?? [];
-  const totalUploads = analytics?.uploads?.total ?? 0;
-  const uploadsWeeklyChange = analytics?.uploads?.weekly_change ?? 0;
-  const uploadsChart = analytics?.uploads?.chart ?? [];
   
   const totalUsersCount = analytics?.user_distribution?.total_users ?? 0;
   const customersCount = analytics?.user_distribution?.customers?.count ?? 0;
@@ -119,89 +219,35 @@ export default function AnalyticsDashboard() {
   const customersPercent = (customersCount / chartTotal) * 100;
   const sellersPercent = (sellersCount / chartTotal) * 100;
 
-  const newUsers = metrics?.total_customers?.new_since_last_month ?? 0;
-  const isUp = (val: number) => val >= 0;
-
   return (
     <div className="flex flex-col gap-4">
 
       {/* ── Row 1: 3 metric cards ── */}
       <div className="grid grid-cols-3 gap-4">
-
-        {/* Card 1 — Total Users */}
-        <div className="bg-white rounded-xl border border-border p-3 col-span-1 flex flex-col justify-between" style={{ minHeight: 180 }}>
-          <p className="text-sm font-medium text-foreground mb-0.5 mt-4">Total Users</p>
-          <button className="flex items-center gap-1 text-xs text-muted-foreground mb-1 mt-2">
-            This week <ChevronDown size={11} />
-          </button>
-          <div className="flex items-end gap-2 flex-1">
-            <div className="flex flex-col justify-end">
-              <div className="flex items-center gap-2 mb-2 mt-2">
-                <p className="text-3xl font-bold text-foreground">
-                  {loading ? "..." : totalUsers.toLocaleString()}
-                </p>
-                <span className={isUp(usersWeeklyChange) ? "text-green-500 text-lg" : "text-red-500 text-lg"}>
-                  {isUp(usersWeeklyChange) ? "▲" : "▼"}
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {usersWeeklyChange > 0 ? "+" : ""}{usersWeeklyChange} this week
-              </p>
-            </div>
-            <div className="flex-1 flex items-end">
-              <UsersChart chartData={usersChart} />
-            </div>
-          </div>
-        </div>
-
-        {/* Card 2 — New Users */}
-        <div className="bg-white rounded-xl border border-border p-3 flex flex-col justify-between" style={{ minHeight: 180 }}>
-          <p className="text-sm font-medium text-foreground mb-0.5 mt-4">New Users</p>
-          <button className="flex items-center gap-1 text-xs text-muted-foreground mb-1 mt-2">
-            This month <ChevronDown size={11} />
-          </button>
-          <div className="flex items-end gap-2 flex-1">
-            <div className="flex flex-col justify-end">
-              <div className="flex items-center gap-2 mb-2">
-                <p className="text-3xl font-bold text-foreground">
-                  {loading ? "..." : newUsers.toLocaleString()}
-                </p>
-                <span className="text-green-500 text-lg">▲</span>
-              </div>
-              <p className="text-xs text-muted-foreground">since last month</p>
-            </div>
-            <div className="flex-1 flex items-end">
-              <SmoothWaveChart chartData={usersChart} />
-            </div>
-          </div>
-        </div>
-
-        {/* Card 3 — Uploads */}
-        <div className="bg-white rounded-xl border border-border p-3 flex flex-col justify-between" style={{ minHeight: 180 }}>
-          <p className="text-sm font-medium text-foreground mb-0.5 mt-4">Uploads</p>
-          <button className="flex items-center gap-1 text-xs text-muted-foreground mb-1 mt-2">
-            This week <ChevronDown size={11} />
-          </button>
-          <div className="flex items-end gap-2 flex-1">
-            <div className="flex flex-col justify-end">
-              <div className="flex items-center gap-2 mb-2">
-                <p className="text-3xl font-bold text-foreground">
-                  {loading ? "..." : totalUploads.toLocaleString()}
-                </p>
-                <span className={isUp(uploadsWeeklyChange) ? "text-green-500 text-lg" : "text-red-500 text-lg"}>
-                  {isUp(uploadsWeeklyChange) ? "▲" : "▼"}
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {uploadsWeeklyChange > 0 ? "+" : ""}{uploadsWeeklyChange} this week
-              </p>
-            </div>
-            <div className="flex-1 flex items-end">
-              <SmoothWaveChart chartData={uploadsChart} />
-            </div>
-          </div>
-        </div>
-
+        <MetricCard
+          label="Total Users"
+          metricKey="users"
+          renderValue={(d) => (d?.total ?? 0).toLocaleString()}
+          renderTrend={(d) => {
+            const c = d?.weekly_change ?? 0;
+            return `${c > 0 ? "+" : ""}${c} this period`;
+          }}
+        />
+        <MetricCard
+          label="New Users"
+          metricKey="users"
+          renderValue={(d) => (d?.weekly_change ?? 0).toLocaleString()}
+          renderTrend={() => "new this period"}
+        />
+        <MetricCard
+          label="Uploads"
+          metricKey="uploads"
+          renderValue={(d) => (d?.total ?? 0).toLocaleString()}
+          renderTrend={(d) => {
+            const c = d?.weekly_change ?? 0;
+            return `${c > 0 ? "+" : ""}${c} this period`;
+          }}
+        />
       </div>
 
       {/* ── Row 2: Top Performing + Users donut ── */}

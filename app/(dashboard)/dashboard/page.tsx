@@ -75,7 +75,7 @@ function Page() {
 
   return (
     <>
-      <p className="text-[#616161] mb-2.5">Good Day, {firstName}!</p>
+      <p className="text-[#616161] mb-2.5">Good Day!</p>
       <InnerLayout sectionHeader="Your Dashboard">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 mb-7">
           <OverviewWithTime

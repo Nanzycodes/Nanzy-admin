@@ -1,7 +1,7 @@
 import apiClient from "@/lib/apiclient";
 
-export async function fetchAnalytics() {
-  const response = await apiClient.get("/admin/dashboard/analytics/");
+export async function fetchAnalytics(timeframe = "weekly") {
+  const response = await apiClient.get(`/admin/dashboard/analytics/?timeframe=${timeframe}`);
   return response.data?.data ?? null;
 }
 
