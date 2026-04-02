@@ -265,24 +265,24 @@ export default function ContentTable({ tab }: ContentTableProps) {
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Content type</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Title</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Submission date</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Status</th>
+                {/* <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Status</th> */}
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
+                  <td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">
                     <Loader2 size={20} className="animate-spin mx-auto" />
                   </td>
                 </tr>
               ) : error ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-red-500 text-sm">{error}</td>
+                  <td colSpan={6} className="px-4 py-12 text-center text-red-500 text-sm">{error}</td>
                 </tr>
               ) : rows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground text-sm">
+                  <td colSpan={6} className="px-4 py-12 text-center text-muted-foreground text-sm">
                     No content found.
                   </td>
                 </tr>
@@ -319,11 +319,11 @@ export default function ContentTable({ tab }: ContentTableProps) {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-foreground">{dateStr}</td>
-                      <td className="px-4 py-3">
+                      {/* <td className="px-4 py-3">
                         <span className={`inline-flex items-center px-3 py-1 rounded-md text-xs font-medium border ${getStatusBadge(row.status)}`}>
                           {statusLabel}
                         </span>
-                      </td>
+                      </td> */}
                       <td className="px-4 py-3">
                         <div
                           className="relative inline-block"

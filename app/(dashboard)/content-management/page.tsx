@@ -10,8 +10,8 @@ type TabFilter = "all" | "approved" | "flagged";
 
 const TABS: { label: string; value: TabFilter }[] = [
   { label: "All", value: "all" },
-  { label: "Approved", value: "approved" },
-  { label: "Flagged", value: "flagged" },
+  // { label: "Approved", value: "approved" },
+  // { label: "Flagged", value: "flagged" },
 ];
 
 interface ContentStats {
@@ -53,7 +53,7 @@ export default function ContentManagementPage() {
           growth={stats?.total_growth}
           growthLabel="since last month"
         />
-        <StatCard
+        {/* <StatCard
           label="Flagged Contents"
           value={flagged}
           growth={stats?.flagged_growth}
@@ -64,7 +64,7 @@ export default function ContentManagementPage() {
           value={approved}
           growth={stats?.approved_growth}
           growthLabel="since last week"
-        />
+        /> */}
       </div>
 
       {/* Tabs */}
