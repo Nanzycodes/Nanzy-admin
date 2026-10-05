@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Search, ListFilter, Calendar, ChevronDown, TrendingUp, TrendingDown, X, Loader2 } from "lucide-react";
+import { Search, ListFilter, Calendar, ChevronDown, TrendingUp, X, Loader2 } from "lucide-react";
 import { Order, OrderStatus, OrderDetail, STATUS_LABELS } from "@/types/order";
 import {
   DropdownMenu,
@@ -13,9 +13,12 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import apiClient from "@/lib/apiclient";
+import { toOrderList } from "@/lib/demo-orders";
 
 interface OrdersTableProps {
   onViewDetails: (order: OrderDetail) => void;
+  demoOrders?: OrderDetail[];
+  onUpdateDemoStatus?: (id: string, status: OrderStatus) => void;
 }
 
 const TABS: { label: string; value: OrderStatus | "all" }[] = [
@@ -26,6 +29,8 @@ const TABS: { label: string; value: OrderStatus | "all" }[] = [
 
 const FILTER_STATUSES: { label: string; value: OrderStatus }[] = [
   { label: "Pending", value: "PENDING" },
+  { label: "Paid", value: "PAID" },
+  { label: "Shipped", value: "SHIPPED" },
   { label: "In-transit", value: "IN_TRANSIT" },
   { label: "Delivered", value: "DELIVERED" },
   { label: "Rejected", value: "REJECTED" },
@@ -34,7 +39,11 @@ const FILTER_STATUSES: { label: string; value: OrderStatus }[] = [
 
 const ITEMS_PER_PAGE = 7;
 
-export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
+export default function OrdersTable({
+  onViewDetails,
+  demoOrders,
+  onUpdateDemoStatus,
+}: OrdersTableProps) {
   const [activeTab, setActiveTab] = useState<OrderStatus | "all">("all");
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -75,26 +84,30 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
 
   // ── Fetch Stats (each card fetches independently) ──
   useEffect(() => {
+    if (demoOrders !== undefined) return;
     apiClient.get(`/admin/orders/?period=${totalOrdersPeriod}&page_size=1`)
       .then((res) => setGlobalTotalOrders(res.data?.data?.count ?? res.data?.count ?? 0))
       .catch(() => {});
-  }, [totalOrdersPeriod]);
+  }, [totalOrdersPeriod, demoOrders]);
 
   useEffect(() => {
+    if (demoOrders !== undefined) return;
     apiClient.get(`/admin/orders/?search=IN_TRANSIT&period=${transitPeriod}&page_size=1`)
       .then((res) => setTransitCount(res.data?.data?.count ?? res.data?.count ?? 0))
       .catch(() => {});
-  }, [transitPeriod]);
+  }, [transitPeriod, demoOrders]);
 
   useEffect(() => {
+    if (demoOrders !== undefined) return;
     apiClient.get(`/admin/orders/?search=DELIVERED&period=${deliveredPeriod}&page_size=1`)
       .then((res) => setDeliveredCount(res.data?.data?.count ?? res.data?.count ?? 0))
       .catch(() => {});
-  }, [deliveredPeriod]);
+  }, [deliveredPeriod, demoOrders]);
 
   // ── Fetch Table Data ──
   useEffect(() => {
     async function fetchOrders() {
+      if (demoOrders !== undefined) return;
       setLoading(true);
       setError(null);
       try {
@@ -137,9 +150,34 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
       }
     }
     fetchOrders();
-  }, [currentPage, activeTab, search, filterStatus, dateFrom, dateTo]);
+  }, [currentPage, activeTab, search, filterStatus, dateFrom, dateTo, demoOrders]);
 
-  const totalPages = Math.max(1, Math.ceil(tableTotalCount / ITEMS_PER_PAGE));
+  const demoList = demoOrders?.map(toOrderList);
+  const filteredDemoOrders = demoList?.filter((order) => {
+    const status = filterStatus ?? (activeTab === "all" ? null : activeTab);
+    const matchesStatus = !status || order.status === status;
+    const matchesSearch =
+      !search ||
+      `${order.customer} ${order.id} ${order.total_amount}`
+        .toLowerCase()
+        .includes(search.toLowerCase());
+    const createdAt = new Date(order.created_at);
+    const matchesFrom = !dateFrom || createdAt >= dateFrom;
+    const matchesTo = !dateTo || createdAt <= dateTo;
+    return matchesStatus && matchesSearch && matchesFrom && matchesTo;
+  });
+  const displayedOrders =
+    filteredDemoOrders === undefined
+      ? orders
+      : filteredDemoOrders.slice(
+          (currentPage - 1) * ITEMS_PER_PAGE,
+          currentPage * ITEMS_PER_PAGE,
+        );
+  const displayedCount = filteredDemoOrders?.length ?? tableTotalCount;
+  const totalPages = Math.max(1, Math.ceil(displayedCount / ITEMS_PER_PAGE));
+  const demoTotal = demoOrders?.length;
+  const demoTransit = demoOrders?.filter((order) => order.status === "IN_TRANSIT").length;
+  const demoDelivered = demoOrders?.filter((order) => order.status === "DELIVERED").length;
 
   function getPageNumbers(): (number | "...")[] {
     const pages: (number | "...")[] = [];
@@ -171,10 +209,10 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
             </div>
           }
           label="Total orders"
-          value={String(globalTotalOrders)}
-          trend={`+${globalTotalOrders} new`}
+          value={String(demoTotal ?? globalTotalOrders)}
+          trend={`${demoTotal ?? globalTotalOrders} total`}
           activePeriod={totalOrdersPeriod}
-          onPeriodChange={(val) => setTotalOrdersPeriod(val as any)}
+          onPeriodChange={(val) => setTotalOrdersPeriod(val as "week" | "day" | "month")}
         />
         <StatCard
           icon={
@@ -186,10 +224,10 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
             </div>
           }
           label="Orders in transit"
-          value={String(transitCount)}
-          trend={`+${transitCount} new`}
+          value={String(demoTransit ?? transitCount)}
+          trend={`${demoTransit ?? transitCount} total`}
           activePeriod={transitPeriod}
-          onPeriodChange={(val) => setTransitPeriod(val as any)}
+          onPeriodChange={(val) => setTransitPeriod(val as "week" | "day" | "month")}
         />
         <StatCard
           icon={
@@ -202,10 +240,10 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
             </div>
           }
           label="Orders delivered"
-          value={String(deliveredCount)}
-          trend={`+${deliveredCount} new`}
+          value={String(demoDelivered ?? deliveredCount)}
+          trend={`${demoDelivered ?? deliveredCount} total`}
           activePeriod={deliveredPeriod}
-          onPeriodChange={(val) => setDeliveredPeriod(val as any)}
+          onPeriodChange={(val) => setDeliveredPeriod(val as "week" | "day" | "month")}
         />
       </div>
 
@@ -337,12 +375,12 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
                 <tr>
                   <td colSpan={7} className="text-center py-12 text-red-500">{error}</td>
                 </tr>
-              ) : orders.length === 0 ? (
+              ) : displayedOrders.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="text-center py-12 text-muted-foreground">No orders found</td>
                 </tr>
               ) : (
-                orders.map((order) => (
+                displayedOrders.map((order) => (
                   <tr key={order.id} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
                     <td className="px-4 py-3">
                       <input type="checkbox" className="rounded" />
@@ -355,7 +393,11 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
                         <div>
                           <p className="font-medium text-foreground leading-tight">{order.customer}</p>
                           <p className="text-xs text-muted-foreground leading-tight">
-                            #{order?.id ? String(order.id).split('-')[0].toUpperCase() : "—"}
+                            #{order?.id
+                              ? order.id.startsWith("demo-order-")
+                                ? order.id.slice("demo-order-".length).toUpperCase()
+                                : String(order.id).split("-")[0].toUpperCase()
+                              : "—"}
                           </p>
                         </div>
                       </div>
@@ -385,9 +427,39 @@ export default function OrdersTable({ onViewDetails }: OrdersTableProps) {
                           </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-48">
-                          <DropdownMenuItem onClick={() => onViewDetails(order as any)}>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              const detail = demoOrders?.find((item) => item.id === order.id);
+                              if (detail) onViewDetails(detail);
+                              else onViewDetails(toOrderDetails(order));
+                            }}
+                          >
                             View Details
                           </DropdownMenuItem>
+                          {demoOrders && onUpdateDemoStatus && (
+                            <>
+                              {order.status === "PENDING" && (
+                                <DropdownMenuItem onClick={() => onUpdateDemoStatus(order.id, "PAID")}>
+                                  Mark as paid
+                                </DropdownMenuItem>
+                              )}
+                              {(order.status === "PAID" || order.status === "SHIPPED") && (
+                                <DropdownMenuItem onClick={() => onUpdateDemoStatus(order.id, "IN_TRANSIT")}>
+                                  Mark in transit
+                                </DropdownMenuItem>
+                              )}
+                              {order.status === "IN_TRANSIT" && (
+                                <DropdownMenuItem onClick={() => onUpdateDemoStatus(order.id, "DELIVERED")}>
+                                  Mark delivered
+                                </DropdownMenuItem>
+                              )}
+                              {!["DELIVERED", "CANCELLED", "REJECTED"].includes(order.status) && (
+                                <DropdownMenuItem onClick={() => onUpdateDemoStatus(order.id, "CANCELLED")}>
+                                  Cancel order
+                                </DropdownMenuItem>
+                              )}
+                            </>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </td>
@@ -503,4 +575,34 @@ function StatusBadge({ status }: { status: OrderStatus }) {
       {STATUS_LABELS[status]}
     </span>
   );
+}
+
+function toOrderDetails(order: Order): OrderDetail {
+  return {
+    id: order.id,
+    customer: order.customer,
+    creator: "—",
+    items: [],
+    total_amount: order.total_amount,
+    items_total: order.total_amount,
+    vat_amount: "0",
+    status: order.status,
+    shipping_address: "",
+    payment_reference: "",
+    escrow_reference: "",
+    delivery_confirmed_at: "",
+    delivery_confirmed_by: "",
+    items_count: Number(order.items_count) || 0,
+    is_escrow_active: false,
+    tracking_number: "",
+    carrier_name: "",
+    carrier_slug: "",
+    carrier_logo: "",
+    tracking_url: "",
+    shipped_at: "",
+    shipping_cost: "0",
+    shipping_currency: "NGN",
+    created_at: order.created_at,
+    updated_at: order.updated_at,
+  };
 }

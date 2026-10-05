@@ -1,8 +1,6 @@
-import apiClient, { setAuthTokens, clearAuthTokens } from "@/lib/apiclient";
-
-// ============================================
-// Admin Auth Types
-// ============================================
+import { clearDemoSession, isDemoSession } from "@/lib/demo-mode";
+import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+import type { AdminEntry } from "@/types/user";
 
 export interface AdminLoginRequest {
   email: string;
@@ -12,15 +10,9 @@ export interface AdminLoginRequest {
 export interface AdminLoginResponse {
   success: boolean;
   message: string;
-  data: {
-    access?: string;
-    refresh?: string;
-    [key: string]: any;
-  };
-  errors?: any;
+  data?: { access?: string; refresh?: string };
 }
 
-// Accept Invite
 export interface AcceptInviteRequest {
   token: string;
   password: string;
@@ -30,14 +22,8 @@ export interface AcceptInviteRequest {
 export interface AcceptInviteResponse {
   success: boolean;
   message: string;
-  data?: {
-    token?: string;
-    [key: string]: any;
-  };
-  errors?: any;
 }
 
-// Forgot Password (request a reset email)
 export interface ForgotPasswordRequest {
   email: string;
 }
@@ -45,14 +31,8 @@ export interface ForgotPasswordRequest {
 export interface ForgotPasswordResponse {
   success: boolean;
   message: string;
-  data?: {
-    email?: string;
-    [key: string]: any;
-  };
-  errors?: any;
 }
 
-// Reset Password (set new password)
 export interface ResetPasswordRequest {
   uid: string;
   token: string;
@@ -61,17 +41,9 @@ export interface ResetPasswordRequest {
 }
 
 export interface ResetPasswordResponse {
-  //d: string;
- //oken: string;
- success: boolean;
+  success: boolean;
   message: string;
-  data?:any;
-  errors?: any;
 }
-
-// ============================================
-// Admin Profile Types
-// ============================================
 
 export interface AdminProfile {
   id: string;
@@ -84,109 +56,165 @@ export interface AdminProfile {
   date_joined: string;
 }
 
-// ============================================
-// Admin Auth API Functions
-// ============================================
+const demoProfile: AdminProfile = {
+  id: "demo-admin",
+  email: "admin@nanzy.demo",
+  first_name: "Nanzy",
+  last_name: "Admin",
+  roles: "admin",
+  status: "active",
+  is_active: true,
+  date_joined: "2025-01-01T00:00:00.000Z",
+};
 
-const ADMIN_BASE = "admin";
+function configurationError(): Error {
+  return new Error(
+    "Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY, or use demo mode.",
+  );
+}
+
+function getMetadataString(
+  metadata: Record<string, unknown>,
+  key: string,
+): string {
+  const value = metadata[key];
+  return typeof value === "string" ? value : "";
+}
 
 export const adminAuthApi = {
-  // Admin Login
-  
-login: async (data: AdminLoginRequest): Promise<AdminLoginResponse> => {
-  const response = await apiClient.post<AdminLoginResponse>(
-    `${ADMIN_BASE}/login/`,
-    data
-  );
+  async login({ email, password }: AdminLoginRequest): Promise<AdminLoginResponse> {
+    if (!supabase) throw configurationError();
 
-  // if tokens are returned, store them (common pattern)
-  if (response.data?.data?.access) {
-    setAuthTokens(response.data.data.access, response.data.data.refresh);
-  }
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (error) return { success: false, message: error.message };
 
-  return response.data;
-},
-  // Accept Invite
-  acceptInvite: async (
-    data: AcceptInviteRequest
-  ): Promise<AcceptInviteResponse> => {
-    const response = await apiClient.post<AcceptInviteResponse>(
-      `${ADMIN_BASE}/invite/accept/`,
-      data
-    );
-    return response.data;
+    if (data.user.app_metadata.role !== "admin") {
+      await supabase.auth.signOut();
+      return {
+        success: false,
+        message:
+          "This account does not have the admin role. Ask a project owner to grant admin access in Supabase.",
+      };
+    }
+
+    return { success: true, message: "Signed in." };
   },
 
-  // Forgot Password (request reset email)
-  forgotPassword: async (
-    data: ForgotPasswordRequest
-  ): Promise<ForgotPasswordResponse> => {
-    const response = await apiClient.post<ForgotPasswordResponse>(
-      `${ADMIN_BASE}/password-reset/`,
-      data
-    );
-    return response.data;
+  async acceptInvite(
+    data: AcceptInviteRequest,
+  ): Promise<AcceptInviteResponse> {
+    void data;
+    return {
+      success: false,
+      message:
+        "Admin invitations are managed from the Supabase project dashboard. Invite the user there, then assign the admin role.",
+    };
   },
 
-  // Reset Password (set new password)
-  resetPassword: async (
-    data: ResetPasswordRequest
-  ): Promise<ResetPasswordResponse> => {
-    const response = await apiClient.post<ResetPasswordResponse>(
-      `${ADMIN_BASE}/password-reset/confirm/`,
-      data
-    );
-    return response.data;
+  async forgotPassword({
+    email,
+  }: ForgotPasswordRequest): Promise<ForgotPasswordResponse> {
+    if (!supabase) throw configurationError();
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    return error
+      ? { success: false, message: error.message }
+      : { success: true, message: "Password reset email sent." };
   },
 
-  // Invite admin
-  inviteAdmin: async (data: {
+  async resetPassword(
+    { new_password }: ResetPasswordRequest,
+  ): Promise<ResetPasswordResponse> {
+    if (!supabase) throw configurationError();
+
+    const { error } = await supabase.auth.updateUser({
+      password: new_password,
+    });
+    return error
+      ? { success: false, message: error.message }
+      : { success: true, message: "Password updated." };
+  },
+
+  async inviteAdmin(_data: {
     email: string;
     first_name: string;
     last_name: string;
-  }): Promise<void> => {
-    await apiClient.post(`${ADMIN_BASE}/invite/`, data);
-  },
-
-  // Change password
-  changePassword: async (password: string): Promise<void> => {
-    await apiClient.post(`${ADMIN_BASE}/change-password/`, { password });
-  },
-
-  // Get current admin profile
-  getProfile: async (): Promise<AdminProfile> => {
-    const response = await apiClient.get<{ data: AdminProfile }>(
-      `${ADMIN_BASE}/me/profile/`
+  }): Promise<void> {
+    void _data;
+    throw new Error(
+      "Admin invitations require a trusted server-side email function. Invite users from the Supabase dashboard; never expose a service-role key in this app.",
     );
-    return response.data.data;
   },
 
-  // List all admins
-  getAdmins: async (): Promise<{ count: number; results: import("@/types/user").AdminEntry[] }> => {
-    const response = await apiClient.get<{
-      success: boolean;
-      message: string;
-      data: {
-        count: number;
-        next: string | null;
-        previous: string | null;
-        results: import("@/types/user").AdminEntry[];
+  async changePassword(password: string): Promise<void> {
+    if (!supabase) throw configurationError();
+
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) throw error;
+  },
+
+  async getProfile(): Promise<AdminProfile> {
+    if (isDemoSession()) return demoProfile;
+    if (!supabase) throw configurationError();
+
+    const { data, error } = await supabase.auth.getUser();
+    if (error) throw error;
+    if (!data.user || data.user.app_metadata.role !== "admin") {
+      throw new Error("The signed-in account does not have admin access.");
+    }
+
+    const metadata = data.user.user_metadata;
+    return {
+      id: data.user.id,
+      email: data.user.email ?? "",
+      first_name: getMetadataString(metadata, "first_name"),
+      last_name: getMetadataString(metadata, "last_name"),
+      roles: "admin",
+      status: "active",
+      is_active: true,
+      date_joined: data.user.created_at,
+    };
+  },
+
+  async getAdmins(): Promise<{ count: number; results: AdminEntry[] }> {
+    if (isDemoSession()) {
+      return {
+        count: 1,
+        results: [
+          {
+            id: demoProfile.id,
+            email: demoProfile.email,
+            first_name: demoProfile.first_name,
+            last_name: demoProfile.last_name,
+            roles: demoProfile.roles,
+            status: "active",
+            is_active: true,
+            date_joined: demoProfile.date_joined,
+          },
+        ],
       };
-      errors: any;
-    }>(`${ADMIN_BASE}/admins/`, { params: { page_size: 100 } });
-    return response.data.data;
+    }
+    throw new Error(
+      "Listing auth users requires a trusted server-side function. Manage admin accounts in the Supabase dashboard.",
+    );
   },
 
-  // Logout
-  logout: () => {
-    clearAuthTokens();
+  async logout(): Promise<void> {
+    clearDemoSession();
+    if (!supabase) return;
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
   },
 
-  // Check if admin is authenticated
-  isAuthenticated: (): boolean => {
-    if (typeof window === "undefined") return false;
-    return !!localStorage.getItem("access_token");
+  isAuthenticated(): boolean {
+    return isDemoSession();
   },
 };
 
+export { isSupabaseConfigured };
 export default adminAuthApi;

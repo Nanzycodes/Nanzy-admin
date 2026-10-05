@@ -13,6 +13,7 @@ import apiClient from "@/lib/apiclient";
 
 interface TransactionDetailModalProps {
   transactionId: string;
+  initialTransaction?: Transaction;
   onClose: () => void;
 }
 
@@ -46,6 +47,7 @@ function CopyButton({ value }: { value: string }) {
 
 export default function TransactionDetailModal({
   transactionId,
+  initialTransaction,
   onClose,
 }: TransactionDetailModalProps) {
   const [transaction, setTransaction] = useState<Transaction | null>(null);
@@ -53,6 +55,7 @@ export default function TransactionDetailModal({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (initialTransaction) return;
     async function fetchDetail() {
       setLoading(true);
       setError(null);
@@ -66,28 +69,32 @@ export default function TransactionDetailModal({
         setLoading(false);
       }
     }
-    fetchDetail();
-  }, [transactionId]);
+    void fetchDetail();
+  }, [transactionId, initialTransaction]);
 
   const formattedDate = (() => {
-    if (!transaction) return "—";
+    const currentTransaction = initialTransaction ?? transaction;
+    if (!currentTransaction) return "—";
     try {
-      return format(new Date(transaction.created_at), "dd MMM yyyy, HH:mm");
+      return format(new Date(currentTransaction.created_at), "dd MMM yyyy, HH:mm");
     } catch {
-      return transaction.created_at;
+      return currentTransaction.created_at;
     }
   })();
 
   const updatedDate = (() => {
-    if (!transaction) return "—";
+    const currentTransaction = initialTransaction ?? transaction;
+    if (!currentTransaction) return "—";
     try {
-      return format(new Date(transaction.updated_at), "dd MMM yyyy, HH:mm");
+      return format(new Date(currentTransaction.updated_at), "dd MMM yyyy, HH:mm");
     } catch {
-      return transaction.updated_at;
+      return currentTransaction.updated_at;
     }
   })();
 
-  const amount = transaction ? parseFloat(transaction.amount) : NaN;
+  const displayedTransaction = initialTransaction ?? transaction;
+  const amount = displayedTransaction ? parseFloat(displayedTransaction.amount) : NaN;
+  const isLoading = !initialTransaction && loading;
 
   return (
     <div
@@ -111,28 +118,28 @@ export default function TransactionDetailModal({
 
         {/* Body */}
         <div className="px-6 py-5">
-          {loading ? (
+          {isLoading ? (
             <div className="flex items-center justify-center py-10">
               <Loader2 size={22} className="animate-spin text-muted-foreground" />
             </div>
-          ) : error ? (
+          ) : !initialTransaction && error ? (
             <p className="text-sm text-red-500 text-center py-8">{error}</p>
-          ) : transaction ? (
+          ) : displayedTransaction ? (
             <div className="space-y-5">
               {/* Amount + Status hero row */}
               <div className="flex items-center justify-between bg-muted/40 rounded-lg px-4 py-3">
                 <div>
                   <p className="text-xs text-muted-foreground mb-0.5">Amount</p>
                   <p className="text-2xl font-bold text-foreground">
-                    ₦{isNaN(amount) ? transaction.amount : amount.toLocaleString()}
+                    ₦{isNaN(amount) ? displayedTransaction.amount : amount.toLocaleString()}
                   </p>
                 </div>
                 <span
                   className={`inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium ${
-                    STATUS_STYLES[transaction.status]
+                    STATUS_STYLES[displayedTransaction.status]
                   }`}
                 >
-                  {TRANSACTION_STATUS_LABEL[transaction.status]}
+                  {TRANSACTION_STATUS_LABEL[displayedTransaction.status]}
                 </span>
               </div>
 
@@ -142,9 +149,9 @@ export default function TransactionDetailModal({
                   <p className="text-xs text-muted-foreground mb-1">Transaction ID</p>
                   <div className="flex items-center">
                     <p className="text-sm font-medium text-foreground font-mono truncate">
-                      {transaction.id}
+                      {displayedTransaction.id}
                     </p>
-                    <CopyButton value={transaction.id} />
+                    <CopyButton value={displayedTransaction.id} />
                   </div>
                 </div>
 
@@ -152,23 +159,23 @@ export default function TransactionDetailModal({
                   <p className="text-xs text-muted-foreground mb-1">Wallet ID</p>
                   <div className="flex items-center">
                     <p className="text-sm font-medium text-foreground font-mono truncate">
-                      {transaction.wallet_id}
+                      {displayedTransaction.wallet_id}
                     </p>
-                    <CopyButton value={transaction.wallet_id} />
+                    <CopyButton value={displayedTransaction.wallet_id} />
                   </div>
                 </div>
 
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Type</p>
                   <p className="text-sm font-medium text-foreground">
-                    {formatTransactionType(transaction.transaction_type)}
+                    {formatTransactionType(displayedTransaction.transaction_type)}
                   </p>
                 </div>
 
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Reference</p>
                   <p className="text-sm font-medium text-foreground">
-                    {transaction.reference ?? "—"}
+                    {displayedTransaction.reference ?? "—"}
                   </p>
                 </div>
 
@@ -182,21 +189,21 @@ export default function TransactionDetailModal({
                   <p className="text-sm font-medium text-foreground">{updatedDate}</p>
                 </div>
 
-                {transaction.description && (
+                {displayedTransaction.description && (
                   <div className="col-span-2">
                     <p className="text-xs text-muted-foreground mb-1">Description</p>
-                    <p className="text-sm font-medium text-foreground">{transaction.description}</p>
+                    <p className="text-sm font-medium text-foreground">{displayedTransaction.description}</p>
                   </div>
                 )}
 
-                {transaction.metadata?.order_id != null && (
+                {displayedTransaction.metadata?.order_id != null && (
                   <div className="col-span-2">
                     <p className="text-xs text-muted-foreground mb-1">Order ID</p>
                     <div className="flex items-center">
                       <p className="text-sm font-medium text-foreground font-mono">
-                        {String(transaction.metadata.order_id)}
+                        {String(displayedTransaction.metadata.order_id)}
                       </p>
-                      <CopyButton value={String(transaction.metadata.order_id)} />
+                      <CopyButton value={String(displayedTransaction.metadata.order_id)} />
                     </div>
                   </div>
                 )}

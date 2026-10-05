@@ -10,6 +10,7 @@ interface DeleteProductDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onDeleted: () => void;
+  onDelete?: () => Promise<void>;
 }
 
 export default function DeleteProductDialog({
@@ -17,6 +18,7 @@ export default function DeleteProductDialog({
   isOpen,
   onClose,
   onDeleted,
+  onDelete,
 }: DeleteProductDialogProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +29,8 @@ export default function DeleteProductDialog({
     setLoading(true);
     setError(null);
     try {
-      await productsApi.delete(product.id);
+      if (onDelete) await onDelete();
+      else await productsApi.delete(product.id);
       onDeleted();
       onClose();
     } catch {
@@ -43,11 +46,14 @@ export default function DeleteProductDialog({
       onClick={onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delete-product-title"
         className="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between mb-4">
-          <h2 className="text-lg font-semibold text-foreground">Delete Product</h2>
+          <h2 id="delete-product-title" className="text-lg font-semibold text-foreground">Delete Product</h2>
           <button
             onClick={onClose}
             className="w-9 h-9 flex items-center justify-center rounded-md bg-[#FFE4E4] hover:bg-[#ffd0d0] transition-colors"

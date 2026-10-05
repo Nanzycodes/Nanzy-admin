@@ -1,7 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
-import { OrderDetail, OrderStatus, STATUS_LABELS } from "@/types/order";
+import { OrderDetail, OrderItem, OrderStatus, STATUS_LABELS } from "@/types/order";
 
 interface OrderDetailsModalProps {
   order: OrderDetail;
@@ -31,8 +31,8 @@ function getCompletedStep(status: string): number {
   }
 }
 
-function formatStepDate(dateString?: any) {
-  if (!dateString || typeof dateString !== "string") return null;
+function formatStepDate(dateString?: string | null) {
+  if (!dateString) return null;
   const d = new Date(dateString);
   if (isNaN(d.getTime())) return null;
   
@@ -48,35 +48,38 @@ function formatStepDate(dateString?: any) {
   return `${day}/${month}/${year} at ${hours}:${minutes} ${ampm}`;
 }
 
-// ── THE ULTIMATE FIX: This catches complex objects and forces them into safe text ──
-function safeRender(value: any): string {
+function safeRender(value: unknown): string {
   if (value === null || value === undefined) return "—";
   if (typeof value === "string" || typeof value === "number") return String(value);
-  
+
   if (typeof value === "object") {
-    // If it's an array, join it
     if (Array.isArray(value)) return value.join(", ");
-    
-    // Check for common object properties the API might be sending
-    if (value.name) return String(value.name);
-    if (value.first_name) return `${value.first_name} ${value.last_name || ""}`.trim();
-    if (value.email) return String(value.email);
-    if (value.address) return String(value.address);
-    if (value.street) return `${value.street}, ${value.city || ""}`.trim();
-    
-    // If we have no idea what the object is, safely stringify it so you can see it without crashing
-    return JSON.stringify(value);
+    const record = value as Record<string, unknown>;
+    if (record.name) return String(record.name);
+    if (record.first_name) return `${record.first_name} ${record.last_name || ""}`.trim();
+    if (record.email) return String(record.email);
+    if (record.address) return String(record.address);
+    if (record.street) return `${record.street}, ${record.city || ""}`.trim();
+    return JSON.stringify(record);
   }
-  
+
   return "—";
+}
+
+function formatCurrency(amount: string | number, currency: string) {
+  const normalizedCurrency = currency === "GBP" ? "GBP" : "NGN";
+  return new Intl.NumberFormat(
+    normalizedCurrency === "GBP" ? "en-GB" : "en-NG",
+    { style: "currency", currency: normalizedCurrency },
+  ).format(Number(amount) || 0);
 }
 
 export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalProps) {
   if (!isOpen || !order) return null;
 
-  // Ensure status is safely handled even if it's an object
-  const safeStatus = typeof order.status === "object" ? (order.status as any)?.value || "PENDING" : order.status || "PENDING";
+  const safeStatus = order.status || "PENDING";
   const completedStep = getCompletedStep(safeStatus);
+  const currency = order.shipping_currency || "NGN";
 
   const stepTimestamps = [
     order?.created_at,             
@@ -94,7 +97,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
             <h2 className="text-base font-semibold text-foreground">Order details</h2>
             <div className="flex items-center gap-2 mt-1">
               <span className="text-sm text-muted-foreground">
-                Order ID: {order?.id ? safeRender(order.id).split('-')[0].toUpperCase() : "—"}
+                Order ID: {order?.id ? displayOrderId(order.id) : "—"}
               </span>
               <StatusPill status={safeStatus} />
             </div>
@@ -108,30 +111,27 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-xs text-muted-foreground mb-0.5">Customer</p>
-              {/* Wrapped in safeRender */}
               <p className="text-sm font-medium text-foreground">{safeRender(order?.customer)}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground mb-0.5">Created by</p>
-              {/* Wrapped in safeRender */}
               <p className="text-sm font-medium text-foreground">{safeRender(order?.creator)}</p>
             </div>
           </div>
 
           <div>
             <p className="text-xs text-muted-foreground mb-0.5">Shipping Address</p>
-            {/* Wrapped in safeRender */}
             <p className="text-sm font-medium text-foreground line-clamp-2">{safeRender(order?.shipping_address)}</p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-xs text-muted-foreground mb-0.5">Total Amount</p>
-              <p className="text-sm font-medium text-foreground">₦{Number(order?.total_amount || 0).toLocaleString()}</p>
+              <p className="text-sm font-medium text-foreground">{formatCurrency(order.total_amount, currency)}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground mb-0.5">VAT</p>
-              <p className="text-sm font-medium text-foreground">₦{Number(order?.vat_amount || 0).toLocaleString()}</p>
+              <p className="text-sm font-medium text-foreground">{formatCurrency(order.vat_amount, currency)}</p>
             </div>
           </div>
 
@@ -162,7 +162,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
               {Array.isArray(order?.items) ? order.items.length : Number(order?.items_count || 0)} item(s)
             </p>
             <div className="flex flex-col gap-3">
-              {Array.isArray(order?.items) && order.items.map((item: any, i: number) => (
+              {Array.isArray(order?.items) && order.items.map((item: OrderItem, i: number) => (
                 <div key={item.id || i} className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-lg bg-muted shrink-0 overflow-hidden flex items-center justify-center text-xs text-muted-foreground">
                     {item.image && typeof item.image === "string" ? <img src={item.image} alt="Item" className="w-full h-full object-cover" /> : "img"}
@@ -171,7 +171,7 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
                     <p className="text-sm font-medium text-foreground truncate">{safeRender(item.name) || "Unknown Item"}</p>
                     <p className="text-xs text-muted-foreground truncate">{safeRender(item.variant) || "Standard"}</p>
                   </div>
-                  <p className="text-sm font-semibold text-foreground shrink-0">₦{Number(item.price || 0).toLocaleString()}</p>
+                  <p className="text-sm font-semibold text-foreground shrink-0">{formatCurrency(item.price, currency)}</p>
                 </div>
               ))}
             </div>
@@ -212,12 +212,14 @@ export default function OrderDetailsModal({ order, isOpen, onClose }: OrderDetai
   );
 }
 
-function StatusPill({ status }: { status: any }) {
-  // Ensure status is forced to a string so it never crashes
-  const safeStr = typeof status === "object" ? (status.value || status.name || "PENDING") : String(status || "PENDING");
-  const upStr = safeStr.toUpperCase();
+function displayOrderId(id: string) {
+  return id.startsWith("demo-order-")
+    ? id.slice("demo-order-".length).toUpperCase()
+    : id.split("-")[0].toUpperCase();
+}
 
-  const styles: Record<string, string> = {
+function StatusPill({ status }: { status: OrderStatus }) {
+  const styles: Record<OrderStatus, string> = {
     PENDING: "bg-orange-100 text-orange-700",
     IN_TRANSIT: "bg-green-100 text-green-700",
     DELIVERED: "bg-purple-100 text-purple-700",
@@ -227,11 +229,9 @@ function StatusPill({ status }: { status: any }) {
     SHIPPED: "bg-cyan-100 text-cyan-700",
   };
   
-  const label = STATUS_LABELS[upStr as OrderStatus] || upStr;
-
   return (
-    <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold ${styles[upStr] ?? "bg-gray-100 text-gray-600"}`}>
-      {label}
+    <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold ${styles[status]}`}>
+      {STATUS_LABELS[status]}
     </span>
   );
 }

@@ -26,9 +26,13 @@ export function NavUser({ user }: { user: any }) {
   const { isMobile } = useSidebar();
   const router = useRouter();
 
-  function handleSignOut() {
-    adminAuthApi.logout();
-    router.push("/sign-in");
+  async function handleSignOut() {
+    try {
+      await adminAuthApi.logout();
+      router.push("/sign-in");
+    } catch (error) {
+      console.error("Sign out failed:", error);
+    }
   }
 
   return (

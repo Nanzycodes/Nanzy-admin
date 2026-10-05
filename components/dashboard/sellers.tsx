@@ -2,24 +2,41 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { sellerMiniImg, userAvatar } from "@/lib/utils";
+import { userAvatar } from "@/lib/utils";
+
+type TopSeller = {
+  id?: string | number;
+  business_name?: string;
+  first_name?: string;
+  last_name?: string;
+  followers_count?: number;
+  orders_count?: number;
+  creator_image?: string;
+};
 
 interface SellersProps {
-  data?: any[] | null;
+  data?: TopSeller[] | null;
 }
 
 const Sellers = ({ data }: SellersProps) => {
   if (!data) return null;
+  if (data.length === 0) {
+    return (
+      <p className="py-8 text-center text-sm text-muted-foreground">
+        No sellers yet. Sample sellers appear when sample data is enabled.
+      </p>
+    );
+  }
 
   return (
     <div className="w-full flex flex-col gap-6 py-4">
-      {data.map((item: any, i: number) => (
+      {data.map((item, i) => (
         <SellerItem
           key={item.id || i}
-          name={item?.business_name || `${item?.first_name} ${item?.last_name}`}
-          subtitle={`${item?.followers_count ?? 0} Followers`}
-          orders={item?.orders_count ?? 0}
-          image={item?.creator_image}
+          name={item.business_name || `${item.first_name ?? ""} ${item.last_name ?? ""}`.trim()}
+          subtitle={`${item.followers_count ?? 0} Followers`}
+          orders={item.orders_count ?? 0}
+          image={item.creator_image}
         />
       ))}
     </div>

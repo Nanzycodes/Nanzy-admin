@@ -9,8 +9,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { LockKeyhole, Mail, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import adminAuthApi from "@/lib/auth"; // Admin Auth API
+import adminAuthApi, { isSupabaseConfigured } from "@/lib/auth";
 import { loginSchema } from "@/lib/schema";
+import { startDemoSession } from "@/lib/demo-mode";
 import z from "zod";
 
 type FormValues = z.infer<typeof loginSchema>;
@@ -39,23 +40,21 @@ export default function LoginPage() {
         email: data.email,
         password: data.password,
       });
-console.log("Login response:", response);
-      // consider API response format: { success, message, data: { access, refresh, ... } }
       if (response.success) {
-        router.push("/dashboard"); // redirect after successful login
+        router.push("/dashboard");
       } else {
-        setError(response.message || "Login failed. Please check your credentials.");
+        setError(response.message);
       }
-    } catch (err: any) {
-      console.error("Login API error:", err);
-      setError(
-        err.response?.data?.message ||
-        JSON.stringify(err.response?.data) ||
-        "Login failed"
-      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Login failed.");
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const enterDemo = () => {
+    startDemoSession();
+    router.push("/dashboard");
   };
 
   return (
@@ -64,7 +63,7 @@ console.log("Login response:", response);
         <div className="flex flex-col gap-0.5 mb-5">
           <h1 className="font-mono text-[32px] font-bold">Welcome Back!</h1>
           <p className="text-sm text-[#616161]">
-            Login to access your dashboard
+            Sign in with your Supabase admin account, or explore the demo.
           </p>
         </div>
 
@@ -96,11 +95,30 @@ console.log("Login response:", response);
           <Button
             type="submit"
             className="w-full rounded-[5px] bg-primary text-sm text-white py-5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={isLoading}
+            disabled={isLoading || !isSupabaseConfigured}
           >
-            {isLoading ? "Logging in..." : "Login"}
+            {isLoading
+              ? "Signing in..."
+              : isSupabaseConfigured
+                ? "Sign in"
+                : "Configure Supabase to sign in"}
           </Button>
         </form>
+
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          onClick={enterDemo}
+        >
+          Explore demo dashboard
+        </Button>
+
+        {!isSupabaseConfigured && (
+          <p className="mt-3 text-center text-xs text-muted-foreground">
+            Supabase is not configured. Please set up your Supabase project 
+          </p>
+        )}
 
         <div className="flex justify-end">
           <p className="text-sm">

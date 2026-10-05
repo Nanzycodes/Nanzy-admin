@@ -29,8 +29,8 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "Pearly Admin",
-  description: "Pearly Admin Dashboard",
+  title: "Nanzy Admin",
+  description: "Nanzy Admin Dashboard",
 };
 
 export default function RootLayout({

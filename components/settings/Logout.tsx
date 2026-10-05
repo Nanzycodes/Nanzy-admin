@@ -7,9 +7,13 @@ import adminAuthApi from "@/lib/auth";
 const Logout = () => {
   const router = useRouter();
 
-  const handleLogout = () => {
-    adminAuthApi.logout();
-    router.replace("/sign-in");
+  const handleLogout = async () => {
+    try {
+      await adminAuthApi.logout();
+      router.replace("/sign-in");
+    } catch (error) {
+      console.error("Sign out failed:", error);
+    }
   };
 
   return (

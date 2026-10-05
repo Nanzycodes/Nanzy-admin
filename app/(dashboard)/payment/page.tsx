@@ -1,11 +1,19 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useSyncExternalStore } from "react";
 import Image from "next/image";
 import InnerLayout from "@/components/inner-layout";
 import PaymentTable from "@/components/payment/payment-table";
 import { TrendingUp, ChevronDown } from "lucide-react";
 import apiClient from "@/lib/apiclient";
+import { Transaction } from "@/types/payout";
+import {
+  DemoDataMode,
+  getDemoDataMode,
+  isDemoSession,
+  subscribeToDemoSession,
+} from "@/lib/demo-mode";
+import { getDemoTransactions } from "@/lib/demo-payments";
 
 type PayoutRole = "seller" | "influencer" | "delivery_partner";
 type Timeframe = "weekly" | "monthly" | "yearly";
@@ -83,6 +91,39 @@ function TimeframeDropdown({
 
 export default function PaymentPage() {
   const [activeTab, setActiveTab] = useState<PayoutRole>("seller");
+  const demoSession = useSyncExternalStore(
+    subscribeToDemoSession,
+    isDemoSession,
+    () => false,
+  );
+  const demoDataMode = useSyncExternalStore<DemoDataMode>(
+    subscribeToDemoSession,
+    getDemoDataMode,
+    () => "sample",
+  );
+  const [demoTransactions, setDemoTransactions] = useState<Transaction[]>([]);
+  const [demoTransactionsError, setDemoTransactionsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!demoSession) return;
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (!active) return;
+      try {
+        setDemoTransactions(getDemoTransactions(demoDataMode));
+        setDemoTransactionsError(null);
+      } catch (error) {
+        setDemoTransactionsError(
+          error instanceof Error
+            ? error.message
+            : "Could not load saved demo transactions.",
+        );
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [demoSession, demoDataMode]);
 
   return (
     <InnerLayout sectionHeader="Payment" sectionSubheader="Manage and process payouts">
@@ -98,6 +139,7 @@ export default function PaymentPage() {
             label="Total revenue"
             metricKey="total_revenue"
             valuePrefix="₦"
+            demoTransactions={demoSession ? demoTransactions : undefined}
           />
           <StatCard
             icon={
@@ -108,6 +150,7 @@ export default function PaymentPage() {
             label="Processed payouts"
             metricKey="processed_payout"
             valuePrefix="₦"
+            demoTransactions={demoSession ? demoTransactions : undefined}
           />
           <StatCard
             icon={
@@ -117,6 +160,7 @@ export default function PaymentPage() {
             }
             label="Failed transactions"
             metricKey="failed_transactions"
+            demoTransactions={demoSession ? demoTransactions : undefined}
           />
         </div>
 
@@ -138,7 +182,20 @@ export default function PaymentPage() {
           ))}
         </div>
 
-        <PaymentTable role={activeTab} />
+        {demoSession && (
+          <p className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            These are read-only sample transactions. No payout or payment is being initiated.
+          </p>
+        )}
+        {demoTransactionsError && (
+          <p role="alert" className="mb-4 rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {demoTransactionsError}
+          </p>
+        )}
+        <PaymentTable
+          role={activeTab}
+          demoTransactions={demoSession ? demoTransactions : undefined}
+        />
       </div>
     </InnerLayout>
   );
@@ -149,17 +206,20 @@ function StatCard({
   label,
   metricKey,
   valuePrefix = "",
+  demoTransactions,
 }: {
   icon: React.ReactNode;
   label: string;
   metricKey: "total_revenue" | "processed_payout" | "failed_transactions";
   valuePrefix?: string;
+  demoTransactions?: Transaction[];
 }) {
   const [timeframe, setTimeframe] = useState<Timeframe>("weekly");
   const [value, setValue] = useState("—");
   const [growth, setGrowth] = useState<number | undefined>();
 
   useEffect(() => {
+    if (demoTransactions !== undefined) return;
     async function fetchOverview() {
       try {
         const response = await apiClient.get(
@@ -181,7 +241,53 @@ function StatCard({
       }
     }
     fetchOverview();
-  }, [timeframe, metricKey, valuePrefix]);
+  }, [timeframe, metricKey, valuePrefix, demoTransactions]);
+
+  const threshold = new Date();
+  threshold.setDate(
+    threshold.getDate() -
+      (timeframe === "weekly" ? 7 : timeframe === "monthly" ? 30 : 365),
+  );
+  const periodTransactions = demoTransactions?.filter(
+    (transaction) => new Date(transaction.created_at) >= threshold,
+  );
+  const demoTotal = periodTransactions?.reduce((sum, transaction) => {
+    const amount = Number(transaction.amount);
+    if (!Number.isFinite(amount)) return sum;
+    if (
+      transaction.status === "COMPLETED" &&
+      transaction.transaction_type === "PAYMENT"
+    ) {
+      return metricKey === "total_revenue" ? sum + amount : sum;
+    }
+    if (
+      metricKey === "total_revenue" &&
+      transaction.status === "COMPLETED" &&
+      transaction.transaction_type === "DEPOSIT"
+    ) {
+      return sum + amount;
+    }
+    if (
+      metricKey === "processed_payout" &&
+      transaction.status === "COMPLETED" &&
+      transaction.transaction_type === "WITHDRAWAL"
+    ) {
+      return sum + amount;
+    }
+    if (
+      metricKey === "failed_transactions" &&
+      (transaction.status === "FAILED" || transaction.status === "CANCELLED")
+    ) {
+      return sum + 1;
+    }
+    return sum;
+  }, 0);
+  const displayedValue =
+    demoTotal === undefined
+      ? value
+      : metricKey === "failed_transactions"
+        ? demoTotal.toLocaleString()
+        : `${valuePrefix}${demoTotal.toLocaleString("en-NG")}`;
 
   const isPositive = growth === undefined || growth >= 0;
   const growthLabel =
@@ -195,7 +301,7 @@ function StatCard({
       </div>
       <p className="text-sm text-muted-foreground mb-1">{label}</p>
       <div className="flex items-end justify-between mt-2">
-        <p className="text-2xl font-bold text-foreground">{value}</p>
+        <p className="text-2xl font-bold text-foreground">{displayedValue}</p>
         <span
           className={`text-xs font-medium flex items-center gap-1 px-2 py-0.5 rounded-full ${
             isPositive ? "text-green-700 bg-green-100" : "text-red-600 bg-red-100"

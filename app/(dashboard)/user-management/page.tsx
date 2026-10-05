@@ -1,13 +1,21 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useSyncExternalStore } from "react";
+import { Plus } from "lucide-react";
 import UsersTable from "@/components/users/users-table";
 import UserFormModal from "@/components/users/user-form-modal";
 import UserProfileModal from "@/components/users/user-profile-modal";
 import DeleteUserDialog from "@/components/users/delete-user-dialog";
-import { User, UserRole } from "@/types/user";
+import { User, UserRole, UserStatus } from "@/types/user";
 import apiClient from "@/lib/apiclient";
 import { subDays, subMonths, format } from "date-fns";
+import {
+  DemoDataMode,
+  getDemoDataMode,
+  isDemoSession,
+  subscribeToDemoSession,
+} from "@/lib/demo-mode";
+import { getDemoUsers, saveDemoUsers, toDemoUser } from "@/lib/demo-users";
 
 const TABS: { label: string; role: UserRole | "all" }[] = [
   { label: "Users", role: "all" },
@@ -15,11 +23,23 @@ const TABS: { label: string; role: UserRole | "all" }[] = [
 ];
 
 export default function UsersPage() {
+  const demoSession = useSyncExternalStore(
+    subscribeToDemoSession,
+    isDemoSession,
+    () => false,
+  );
+  const demoDataMode = useSyncExternalStore<DemoDataMode>(
+    subscribeToDemoSession,
+    getDemoDataMode,
+    () => "sample",
+  );
   const [activeTab, setActiveTab] = useState<UserRole | "all">("all");
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [demoUsers, setDemoUsers] = useState<User[]>([]);
+  const [demoUsersError, setDemoUsersError] = useState<string | null>(null);
 
   // ── Stat counts ──
   const [totalUsers, setTotalUsers] = useState(0);
@@ -32,6 +52,26 @@ export default function UsersPage() {
   const [pendingSinceLastWeek, setPendingSinceLastWeek] = useState(0);
 
   useEffect(() => {
+    if (!demoSession) return;
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (!active) return;
+      try {
+        setDemoUsers(getDemoUsers(demoDataMode));
+        setDemoUsersError(null);
+      } catch (error) {
+        setDemoUsersError(
+          error instanceof Error ? error.message : "Could not load saved demo users.",
+        );
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [demoSession, demoDataMode]);
+
+  useEffect(() => {
+    if (demoSession) return;
     async function fetchCounts() {
       try {
         const today = new Date();
@@ -68,21 +108,118 @@ export default function UsersPage() {
       }
     }
     fetchCounts();
-  }, []);
+  }, [demoSession]);
 
   const handleViewDetails = (user: User) => { setSelectedUser(user); setIsProfileModalOpen(true); };
   const handleEdit = (user: User) => { setSelectedUser(user); setIsEditModalOpen(true); };
   const handleDelete = (user: User) => { setSelectedUser(user); setIsDeleteDialogOpen(true); };
 
+  function persistDemoUsers(next: User[]) {
+    try {
+      saveDemoUsers(demoDataMode, next);
+      setDemoUsers(next);
+      setDemoUsersError(null);
+      return true;
+    } catch (error) {
+      setDemoUsersError(
+        error instanceof Error ? error.message : "Could not save demo users.",
+      );
+      return false;
+    }
+  }
+
+  function saveUser(input: {
+    name: string;
+    email: string;
+    role: UserRole;
+    status: UserStatus;
+  }): boolean {
+    const user = toDemoUser({ ...input, existingUser: selectedUser ?? undefined });
+    const next = selectedUser
+      ? demoUsers.map((item) => (item.user_id === user.user_id ? user : item))
+      : [user, ...demoUsers];
+    if (persistDemoUsers(next)) {
+      setIsEditModalOpen(false);
+      setSelectedUser(null);
+      return true;
+    }
+    return false;
+  }
+
+  function updateDemoUserStatus(user: User, status: UserStatus) {
+    persistDemoUsers(
+      demoUsers.map((item) =>
+        item.user_id === user.user_id
+          ? { ...item, status, is_active: status === "active" }
+          : item,
+      ),
+    );
+  }
+
+  function deleteDemoUser(user: User): boolean {
+    if (persistDemoUsers(demoUsers.filter((item) => item.user_id !== user.user_id))) {
+      setIsDeleteDialogOpen(false);
+      setSelectedUser(null);
+      return true;
+    }
+    return false;
+  }
+
+  const demoUsersForTab =
+    activeTab === "all"
+      ? demoUsers
+      : demoUsers.filter((user) => user.role === activeTab);
+  const statsUsers = demoSession ? demoUsers : null;
+  const totalUsersValue = statsUsers?.length ?? totalUsers;
+  const usersSinceLastMonthValue =
+    statsUsers?.filter((user) => new Date(user.date_joined) >= subMonths(new Date(), 1)).length ??
+    usersSinceLastMonth;
+  const activeUsersValue =
+    statsUsers?.filter((user) => user.status === "active").length ?? activeUsers;
+  const activeSinceLastWeekValue =
+    statsUsers?.filter(
+      (user) => user.status === "active" && new Date(user.date_joined) >= subDays(new Date(), 7),
+    ).length ?? activeSinceLastWeek;
+  const pendingUsersValue =
+    statsUsers?.filter((user) => user.status === "pending").length ?? pendingUsers;
+  const pendingSinceLastWeekValue =
+    statsUsers?.filter(
+      (user) => user.status === "pending" && new Date(user.date_joined) >= subDays(new Date(), 7),
+    ).length ?? pendingSinceLastWeek;
+
   return (
     <div>
       {/* ── Header ── */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Users</h1>
-          <p className="text-sm text-muted-foreground">Manage users</p>
+          <p className="text-sm text-muted-foreground">Manage users and account access</p>
         </div>
+        {demoSession && (
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedUser(null);
+              setIsEditModalOpen(true);
+            }}
+            className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+          >
+            <Plus size={16} />
+            Add user
+          </button>
+        )}
       </div>
+
+      {demoSession && (
+        <p className="mb-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Demo users are saved in this browser only. New-user passwords are used for form validation and are never saved or sent.
+        </p>
+      )}
+      {demoUsersError && (
+        <p role="alert" className="mb-5 rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {demoUsersError}
+        </p>
+      )}
 
       {/* ── Tabs ── */}
       <div className="flex gap-1 mb-6 border-b border-border">
@@ -105,18 +242,18 @@ export default function UsersPage() {
       <div className="grid grid-cols-3 gap-4 mb-6">
         <StatCard 
           label="Total Users" 
-          value={totalUsers} 
-          trend={`${usersSinceLastMonth.toLocaleString()} since last month`} 
+          value={totalUsersValue}
+          trend={`${usersSinceLastMonthValue.toLocaleString()} since last month`}
         />
         <StatCard 
           label="Active Users" 
-          value={activeUsers} 
-          trend={`${activeSinceLastWeek.toLocaleString()} since last week`} 
+          value={activeUsersValue}
+          trend={`${activeSinceLastWeekValue.toLocaleString()} since last week`}
         />
         <StatCard 
           label="Pending Users" 
-          value={pendingUsers} 
-          trend={`${pendingSinceLastWeek.toLocaleString()} since last week`} 
+          value={pendingUsersValue}
+          trend={`${pendingSinceLastWeekValue.toLocaleString()} since last week`}
         />
       </div>
 
@@ -127,15 +264,18 @@ export default function UsersPage() {
           onViewDetails={handleViewDetails}
           onEdit={handleEdit}
           onDelete={handleDelete}
+          demoUsers={demoSession ? demoUsersForTab : undefined}
+          onUpdateDemoStatus={demoSession ? updateDemoUserStatus : undefined}
         />
       </div>
 
       {/* ── Edit User Modal ── */}
-      {selectedUser && isEditModalOpen && (
+      {isEditModalOpen && (
         <UserFormModal
-          mode="edit"
-          user={selectedUser}
+          mode={selectedUser ? "edit" : "create"}
+          user={selectedUser ?? undefined}
           isOpen={isEditModalOpen}
+          onSave={demoSession ? saveUser : undefined}
           onClose={() => { setIsEditModalOpen(false); setSelectedUser(null); }}
         />
       )}
@@ -155,7 +295,18 @@ export default function UsersPage() {
         <DeleteUserDialog
           user={selectedUser}
           isOpen={isDeleteDialogOpen}
-          onDeleted={() => window.location.reload()}
+          onDelete={
+            demoSession
+              ? async () => {
+                  if (!deleteDemoUser(selectedUser)) {
+                    throw new Error("Could not save the updated demo user list.");
+                  }
+                }
+              : undefined
+          }
+          onDeleted={() => {
+            if (!demoSession) window.location.reload();
+          }}
           onClose={() => { setIsDeleteDialogOpen(false); setSelectedUser(null); }}
         />
       )}

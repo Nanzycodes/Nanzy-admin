@@ -14,11 +14,62 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import apiClient from "@/lib/apiclient";
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function mapApiUser(value: unknown, roleFilter: UserRole | "all"): User | null {
+  if (!isRecord(value)) return null;
+  const first_name = typeof value.first_name === "string" ? value.first_name : "";
+  const last_name = typeof value.last_name === "string" ? value.last_name : "";
+  const email = typeof value.email === "string" ? value.email : "";
+  if (!email) return null;
+  const role =
+    roleFilter === "seller"
+      ? "seller"
+      : value.role === "seller" || value.role === "influencer"
+        ? value.role
+        : "user";
+  const status =
+    value.status === "active" ||
+    value.status === "pending" ||
+    value.status === "suspended" ||
+    value.status === "inactive"
+      ? value.status
+      : "inactive";
+  const userId =
+    typeof value.user_id === "string"
+      ? value.user_id
+      : typeof value.id === "string" || typeof value.id === "number"
+        ? String(value.id)
+        : "";
+  if (!userId) return null;
+
+  return {
+    id: typeof value.id === "number" ? value.id : Number(value.id) || 0,
+    user_id: userId,
+    email,
+    first_name,
+    last_name,
+    name: `${first_name} ${last_name}`.trim() || email,
+    status,
+    is_active: typeof value.is_active === "boolean" ? value.is_active : status === "active",
+    date_joined:
+      typeof value.date_joined === "string" ? value.date_joined : "",
+    phone_number:
+      typeof value.phone_number === "string" ? value.phone_number : undefined,
+    bio: typeof value.bio === "string" ? value.bio : undefined,
+    role,
+  };
+}
+
 interface UsersTableProps {
   roleFilter: UserRole | "all";
   onViewDetails: (user: User) => void;
   onEdit: (user: User) => void;
   onDelete: (user: User) => void;
+  demoUsers?: User[];
+  onUpdateDemoStatus?: (user: User, status: UserStatus) => void;
 }
 
 const ITEMS_PER_PAGE = 7;
@@ -42,6 +93,8 @@ export default function UsersTable({
   onViewDetails,
   onEdit,
   onDelete,
+  demoUsers,
+  onUpdateDemoStatus,
 }: UsersTableProps) {
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -89,17 +142,17 @@ export default function UsersTable({
           url = "/admin/sellers/?";
         }
 
-        const response = await apiClient.get(`${url}${params.toString()}`);
+        const response = await apiClient.get<unknown>(`${url}${params.toString()}`);
         const data = response.data;
+        const payload = isRecord(data) && isRecord(data.data) ? data.data : null;
+        const results = payload?.results;
 
-        if (data.data?.results) {
-          const mapped: User[] = data.data.results.map((u: any) => ({
-            ...u,
-            name: `${u.first_name} ${u.last_name}`.trim() || u.email,
-            role: roleFilter === "seller" ? "seller" : u.role ?? "user",
-          }));
+        if (Array.isArray(results)) {
+          const mapped = results
+            .map((user) => mapApiUser(user, roleFilter))
+            .filter((user): user is User => user !== null);
           setUsers(mapped);
-          setTotalCount(data.data.count);
+          setTotalCount(typeof payload?.count === "number" ? payload.count : mapped.length);
         } else {
           setUsers([]);
           setTotalCount(0);
@@ -110,10 +163,28 @@ export default function UsersTable({
         setLoading(false);
       }
     }
-    fetchUsers();
-  }, [currentPage, roleFilter, search, filterStatus, dateFrom, dateTo]);
+    if (demoUsers === undefined) void fetchUsers();
+  }, [currentPage, roleFilter, search, filterStatus, dateFrom, dateTo, demoUsers]);
 
-  const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE));
+  const filteredDemoUsers = demoUsers?.filter((user) => {
+    const matchesSearch = `${user.name} ${user.email} ${user.user_id}`
+      .toLowerCase()
+      .includes(search.toLowerCase());
+    const matchesStatus = !filterStatus || user.status === filterStatus;
+    const dateJoined = new Date(user.date_joined);
+    const matchesFrom = !dateFrom || dateJoined >= dateFrom;
+    const matchesTo = !dateTo || dateJoined <= dateTo;
+    return matchesSearch && matchesStatus && matchesFrom && matchesTo;
+  });
+  const displayedUsers =
+    filteredDemoUsers === undefined
+      ? users
+      : filteredDemoUsers.slice(
+          (currentPage - 1) * ITEMS_PER_PAGE,
+          currentPage * ITEMS_PER_PAGE,
+        );
+  const displayedTotal = filteredDemoUsers?.length ?? totalCount;
+  const totalPages = Math.max(1, Math.ceil(displayedTotal / ITEMS_PER_PAGE));
 
   function getPageNumbers(): (number | "...")[] {
     const pages: (number | "...")[] = [];
@@ -241,12 +312,12 @@ export default function UsersTable({
               <tr>
                 <td colSpan={6} className="text-center py-12 text-red-500">{error}</td>
               </tr>
-            ) : users.length === 0 ? (
+            ) : displayedUsers.length === 0 ? (
               <tr>
                 <td colSpan={6} className="text-center py-12 text-muted-foreground">No users found</td>
               </tr>
             ) : (
-              users.map((user) => (
+              displayedUsers.map((user) => (
                 <tr key={user.user_id} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
                   <td className="px-4 py-3">
                     <input type="checkbox" className="rounded" />
@@ -286,6 +357,26 @@ export default function UsersTable({
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-40">
                         <DropdownMenuItem onClick={() => onViewDetails(user)}>View Details</DropdownMenuItem>
+                        {demoUsers && (
+                          <>
+                            <DropdownMenuItem onClick={() => onEdit(user)}>Edit user</DropdownMenuItem>
+                            {user.status === "active" ? (
+                              <DropdownMenuItem onClick={() => onUpdateDemoStatus?.(user, "suspended")}>
+                                Suspend user
+                              </DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem onClick={() => onUpdateDemoStatus?.(user, "active")}>
+                                Activate user
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem
+                              onClick={() => onDelete(user)}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              Delete user
+                            </DropdownMenuItem>
+                          </>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </td>

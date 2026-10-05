@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { Plus } from "lucide-react";
 import InnerLayout from "@/components/inner-layout";
 import ProductsTable from "@/components/products/products-table";
 import ExperienceTable from "@/components/products/experience-table";
@@ -11,13 +12,25 @@ import CollectionDetailModal from "@/components/products/collection-detail-modal
 import DeleteProductDialog from "@/components/products/delete-product-dialog";
 import DeleteExperienceDialog from "@/components/products/delete-experience-dialog";
 import DeleteCollectionDialog from "@/components/products/delete-collection-dialog";
-import { ProductList } from "@/types/product";
+import { ProductDetail, ProductList } from "@/types/product";
 import { ExperienceList } from "@/types/experience";
 import { ContentItem, ContentType } from "@/types/collection";
 import { productsApi } from "@/lib/products-api";
 import { experiencesApi } from "@/lib/experiences-api";
 import { collectionsApi } from "@/lib/collections-api";
 import { downloadCSV } from "@/lib/csv";
+import ProductFormModal from "@/components/products/product-form-modal";
+import {
+  DemoDataMode,
+  getDemoDataMode,
+  isDemoSession,
+  subscribeToDemoSession,
+} from "@/lib/demo-mode";
+import {
+  getDemoProducts,
+  saveDemoProducts,
+  toProductList,
+} from "@/lib/demo-products";
 
 type Tab = "products" | "experience" | "collections";
 
@@ -30,13 +43,61 @@ const TABS: { label: string; value: Tab; count?: number }[] = [
 const Page = () => {
   const [activeTab, setActiveTab] = useState<Tab>("products");
   const [exporting, setExporting] = useState(false);
+  const demoSession = useSyncExternalStore(
+    subscribeToDemoSession,
+    isDemoSession,
+    () => false,
+  );
+  const demoDataMode = useSyncExternalStore<DemoDataMode>(
+    subscribeToDemoSession,
+    getDemoDataMode,
+    () => "sample",
+  );
+  const [demoProducts, setDemoProducts] = useState<ProductDetail[]>([]);
+  const [demoProductsError, setDemoProductsError] = useState<string | null>(null);
+  const [isProductFormOpen, setIsProductFormOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<ProductDetail | null>(null);
 
   // Products
   const [productsRefreshKey, setProductsRefreshKey] = useState(0);
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
+  const [selectedDemoProduct, setSelectedDemoProduct] = useState<ProductDetail | null>(null);
   const [isProductDetailOpen, setIsProductDetailOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<ProductList | null>(null);
   const [isDeleteProductOpen, setIsDeleteProductOpen] = useState(false);
+
+  useEffect(() => {
+    if (!demoSession) return;
+    try {
+      setDemoProducts(getDemoProducts(demoDataMode));
+      setDemoProductsError(null);
+    } catch (error) {
+      setDemoProductsError(
+        error instanceof Error ? error.message : "Could not load saved demo products.",
+      );
+    }
+  }, [demoSession, demoDataMode]);
+
+  function saveProduct(product: ProductDetail) {
+    const next = demoProducts.some((item) => item.id === product.id)
+      ? demoProducts.map((item) => (item.id === product.id ? product : item))
+      : [product, ...demoProducts];
+    try {
+      saveDemoProducts(demoDataMode, next);
+      setDemoProducts(next);
+      setDemoProductsError(null);
+    } catch (error) {
+      setDemoProductsError(
+        error instanceof Error ? error.message : "Could not save this demo product.",
+      );
+    }
+  }
+
+  function deleteDemoProduct(id: number) {
+    const next = demoProducts.filter((product) => product.id !== id);
+    saveDemoProducts(demoDataMode, next);
+    setDemoProducts(next);
+  }
 
   // Experiences
   const [experienceRefreshKey, setExperienceRefreshKey] = useState(0);
@@ -57,8 +118,10 @@ const Page = () => {
     setExporting(true);
     try {
       if (activeTab === "products") {
-        const res = await productsApi.list({ page_size: 1000 });
-        const rows = res.data.data.results.map((p) => ({
+        const products = demoSession
+          ? demoProducts.map(toProductList)
+          : (await productsApi.list({ page_size: 1000 })).data.data.results;
+        const rows = products.map((p) => ({
           ID: p.id,
           Seller: p.creator_name,
           Title: p.title,
@@ -138,21 +201,58 @@ const Page = () => {
             </button>
           ))}
         </div>
-        <button
-          onClick={handleExport}
-          disabled={exporting}
-          className="mb-1 px-5 py-2 rounded-md bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60"
-        >
-          {exporting ? "Exporting..." : "Export CSV"}
-        </button>
+        <div className="flex items-center gap-2">
+          {demoSession && activeTab === "products" && (
+            <button
+              type="button"
+              onClick={() => {
+                setEditingProduct(null);
+                setIsProductFormOpen(true);
+              }}
+              className="mb-1 inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+            >
+              <Plus size={16} />
+              Add product
+            </button>
+          )}
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            className="mb-1 rounded-md bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
+          >
+            {exporting ? "Exporting..." : "Export CSV"}
+          </button>
+        </div>
       </div>
+
+      {demoSession && (
+        <p className="border-b border-border bg-amber-50 px-4 py-2 text-xs text-amber-900">
+          Demo product changes are saved in this browser and are not sent to marketplace services.
+        </p>
+      )}
+      {demoProductsError && (
+        <p role="alert" className="border-b border-border bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {demoProductsError}
+        </p>
+      )}
 
       {/* Tables */}
       {activeTab === "products" && (
         <ProductsTable
           key={productsRefreshKey}
-          onViewDetails={(p) => { setSelectedProductId(p.id); setIsProductDetailOpen(true); }}
+          demoProducts={demoSession ? demoProducts.map(toProductList) : undefined}
+          onViewDetails={(p) => {
+            setSelectedProductId(p.id);
+            setSelectedDemoProduct(
+              demoProducts.find((product) => product.id === p.id) ?? null,
+            );
+            setIsProductDetailOpen(true);
+          }}
           onDelete={(p) => { setProductToDelete(p); setIsDeleteProductOpen(true); }}
+          onEdit={(p) => {
+            setEditingProduct(demoProducts.find((product) => product.id === p.id) ?? null);
+            setIsProductFormOpen(true);
+          }}
         />
       )}
       {activeTab === "experience" && (
@@ -174,15 +274,35 @@ const Page = () => {
       {/* Product modals */}
       <ProductDetailModal
         productId={selectedProductId}
+        initialProduct={selectedDemoProduct}
         isOpen={isProductDetailOpen}
-        onClose={() => { setIsProductDetailOpen(false); setSelectedProductId(null); }}
+        onClose={() => {
+          setIsProductDetailOpen(false);
+          setSelectedProductId(null);
+          setSelectedDemoProduct(null);
+        }}
       />
+      {isProductFormOpen && (
+        <ProductFormModal
+          key={editingProduct?.id ?? "new-product"}
+          product={editingProduct}
+          onClose={() => {
+            setIsProductFormOpen(false);
+            setEditingProduct(null);
+          }}
+          onSave={saveProduct}
+        />
+      )}
       {productToDelete && (
         <DeleteProductDialog
           product={productToDelete}
           isOpen={isDeleteProductOpen}
           onClose={() => { setIsDeleteProductOpen(false); setProductToDelete(null); }}
-          onDeleted={() => setProductsRefreshKey((k) => k + 1)}
+          onDelete={demoSession ? async () => deleteDemoProduct(productToDelete.id) : undefined}
+          onDeleted={() => {
+            if (!demoSession) setProductsRefreshKey((k) => k + 1);
+            setProductToDelete(null);
+          }}
         />
       )}
 

@@ -1,13 +1,10 @@
 "use client";
 
-import * as React from "react";
 import Image, { StaticImageData } from "next/image";
 
 import {
   SidebarMenu,
-  SidebarMenuButton,
   SidebarMenuItem,
-  useSidebar,
 } from "@/components/ui/sidebar";
 
 export function TeamSwitcher({
@@ -19,8 +16,7 @@ export function TeamSwitcher({
     url: string;
   }[];
 }) {
-  // const { toggleSidebar } = useSidebar();
-  const [activeTeam, setActiveTeam] = React.useState(teams[0]);
+  const activeTeam = teams[0];
 
   if (!activeTeam) {
     return null;
@@ -29,11 +25,19 @@ export function TeamSwitcher({
   return (
     <SidebarMenu>
       <SidebarMenuItem>
-        <div
-          className="text-sidebar-primary-foreground flex items-center justify-center size-2/4"
-          // onClick={() => toggleSidebar()}
-        >
-          <Image src={activeTeam.logo} alt="Logo" className="w-full" />
+        <div className="flex items-center gap-2">
+          <Image
+            src={activeTeam.logo}
+            alt={`${activeTeam.name} logo`}
+            width={40}
+            height={40}
+            className="size-10 rounded-full object-cover"
+            unoptimized
+            loading="eager"
+          />
+          <span className="text-sm font-semibold tracking-wide text-foreground">
+            {activeTeam.name}
+          </span>
         </div>
       </SidebarMenuItem>
     </SidebarMenu>

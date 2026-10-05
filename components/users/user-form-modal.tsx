@@ -9,7 +9,7 @@
 // ─────────────────────────────────────────────
 
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,13 +21,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { User, UserRole } from "@/types/user";
+import { User, UserRole, UserStatus } from "@/types/user";
 
 // ── What fields are in the form ──
 type FormValues = {
   name: string;
   email: string;
   role: UserRole;
+  status: UserStatus;
   password: string;
 };
 
@@ -37,6 +38,7 @@ interface UserFormModalProps {
   user?: User;           // only passed when mode="edit"
   isOpen: boolean;
   onClose: () => void;
+  onSave?: (values: Omit<FormValues, "password">) => boolean | void;
 }
 
 export default function UserFormModal({
@@ -44,6 +46,7 @@ export default function UserFormModal({
   user,
   isOpen,
   onClose,
+  onSave,
 }: UserFormModalProps) {
   const isEdit = mode === "edit";
 
@@ -52,38 +55,71 @@ export default function UserFormModal({
     handleSubmit,
     reset,
     setValue,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     defaultValues: {
       name: "",
       email: "",
       role: "user",
+      status: "active",
       password: "",
     },
   });
+  const selectedRole = useWatch({ control, name: "role" });
+  const selectedStatus = useWatch({ control, name: "status" });
 
   // When editing, pre-fill the form with existing user data
   useEffect(() => {
     if (isEdit && user) {
-      setValue("name", user.name);
-      setValue("email", user.email);
-      setValue("role", user.role);
+      reset({
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        status: user.status,
+        password: "",
+      });
     } else {
-      reset(); // clear form when creating
+      reset({
+        name: "",
+        email: "",
+        role: "user",
+        status: "active",
+        password: "",
+      });
     }
-  }, [user, isEdit, isOpen]);
+  }, [user, isEdit, isOpen, reset]);
 
   // Called when the form is submitted
   async function onSubmit(data: FormValues) {
     try {
       if (isEdit) {
-        // TODO: call your update API here
-        console.log("Updating user:", data);
+        if (onSave) {
+          const saved = onSave({
+            name: data.name.trim(),
+            email: data.email.trim(),
+            role: data.role,
+            status: data.status,
+          });
+          if (saved === false) return;
+        } else {
+          console.log("Updating user:", data);
+          onClose();
+        }
       } else {
-        // TODO: call your create API here
-        console.log("Creating user:", data);
+        if (onSave) {
+          const saved = onSave({
+            name: data.name.trim(),
+            email: data.email.trim(),
+            role: data.role,
+            status: data.status,
+          });
+          if (saved === false) return;
+        } else {
+          console.log("Creating user:", data);
+          onClose();
+        }
       }
-      onClose();
       reset();
     } catch (error) {
       console.error("Error saving user:", error);
@@ -101,12 +137,15 @@ export default function UserFormModal({
     >
       {/* ── The white modal box ── */}
       <div
-        className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="user-form-title"
+        className="max-h-[90vh] w-full max-w-md mx-4 overflow-y-auto rounded-xl bg-white p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()} // prevent closing when clicking inside
       >
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 id="user-form-title" className="text-lg font-semibold text-foreground">
             {isEdit ? "Edit User" : "Create User"}
           </h2>
           <button
@@ -116,6 +155,11 @@ export default function UserFormModal({
             <X size={18} className="text-muted-foreground" />
           </button>
         </div>
+        {onSave && (
+          <p className="mb-4 text-xs text-muted-foreground">
+            Demo records stay in this browser. Passwords are never stored.
+          </p>
+        )}
 
         {/* Form */}
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
@@ -140,7 +184,13 @@ export default function UserFormModal({
               id="email"
               type="email"
               placeholder="Enter email address"
-              {...register("email", { required: "Email is required" })}
+              {...register("email", {
+                required: "Email is required",
+                pattern: {
+                  value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                  message: "Enter a valid email address",
+                },
+              })}
             />
             {errors.email && (
               <p className="text-xs text-destructive">{errors.email.message}</p>
@@ -151,7 +201,7 @@ export default function UserFormModal({
           <div className="flex flex-col gap-1.5">
             <Label>Role</Label>
             <Select
-              defaultValue={user?.role ?? "user"}
+              value={selectedRole}
               onValueChange={(val) => setValue("role", val as UserRole)}
             >
               <SelectTrigger>
@@ -161,6 +211,24 @@ export default function UserFormModal({
                 <SelectItem value="user">User</SelectItem>
                 <SelectItem value="seller">Seller</SelectItem>
                 <SelectItem value="influencer">Influencer</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="user-status">Status</Label>
+            <Select
+              value={selectedStatus}
+              onValueChange={(val) => setValue("status", val as UserStatus)}
+            >
+              <SelectTrigger id="user-status">
+                <SelectValue placeholder="Select status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="suspended">Suspended</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
               </SelectContent>
             </Select>
           </div>

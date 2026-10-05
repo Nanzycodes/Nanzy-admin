@@ -1,43 +1,95 @@
 "use client";
 import Image from "next/image";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useSyncExternalStore } from "react";
 
-import { useIsMobile } from "@/hooks/use-mobile";
 import { SidebarTrigger } from "./ui/sidebar";
-import { usePathname, useRouter } from "next/navigation";
-import Link from "next/link";
-import { Button } from "./ui/button";
+import { usePathname } from "next/navigation";
 import { navData } from "./app-sidebar";
 import { userAvatar } from "@/lib/utils";
-import { Input } from "./ui/input";
 import { Bell, Box } from "lucide-react";
 import notificationsApi, { Notification } from "@/lib/notifications-api";
 import { formatDistanceToNow } from "date-fns";
+import {
+  DemoDataMode,
+  getDemoDataMode,
+  isDemoSession,
+  subscribeToDemoSession,
+} from "@/lib/demo-mode";
+import {
+  getDemoAdminAlerts,
+  saveDemoAdminAlerts,
+} from "@/lib/demo-notifications";
+
+function isNotification(value: unknown): value is Notification {
+  if (typeof value !== "object" || value === null) return false;
+  const notification = value as Record<string, unknown>;
+  return (
+    typeof notification.id === "string" &&
+    typeof notification.category === "string" &&
+    typeof notification.title === "string" &&
+    typeof notification.message === "string" &&
+    typeof notification.is_read === "boolean" &&
+    typeof notification.created_at === "string"
+  );
+}
+
+function parseNotifications(payload: unknown): Notification[] {
+  let items: unknown = payload;
+  if (typeof payload === "object" && payload !== null && "data" in payload) {
+    items = payload.data;
+  }
+  if (!Array.isArray(items) || !items.every(isNotification)) {
+    throw new Error("The notification service returned an invalid response.");
+  }
+  return items;
+}
 
 export default function Header() {
-  const isMobile = useIsMobile();
   const pathname = usePathname();
-  const router = useRouter();
   const [userImage, setUserImage] = useState<string>("");
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [markingAll, setMarkingAll] = useState(false);
+  const [notificationError, setNotificationError] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const demoSession = useSyncExternalStore(
+    subscribeToDemoSession,
+    isDemoSession,
+    () => false,
+  );
+  const dataMode = useSyncExternalStore<DemoDataMode>(
+    subscribeToDemoSession,
+    getDemoDataMode,
+    () => "sample",
+  );
 
   const activeProject = navData.navMain.find((item) => item.url === pathname);
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   const fetchNotifications = useCallback(async () => {
+    if (demoSession) {
+      try {
+        setNotifications(getDemoAdminAlerts(dataMode));
+        setNotificationError(null);
+      } catch (error) {
+        setNotifications([]);
+        setNotificationError(
+          error instanceof Error ? error.message : "Could not load saved demo alerts.",
+        );
+      }
+      return;
+    }
     try {
       const res = await notificationsApi.list();
-      const payload = res.data as any;
-      const items = Array.isArray(payload) ? payload : (payload?.data ?? []);
-      setNotifications(items);
-    } catch {
-      // silently fail
+      setNotifications(parseNotifications(res.data));
+      setNotificationError(null);
+    } catch (error) {
+      setNotificationError(
+        error instanceof Error ? error.message : "Could not load notifications.",
+      );
     }
-  }, []);
+  }, [dataMode, demoSession]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -67,20 +119,57 @@ export default function Header() {
   }, []);
 
   const handleMarkAsRead = async (id: string) => {
+    if (demoSession) {
+      const updated = notifications.map((item) =>
+        item.id === id ? { ...item, is_read: true } : item,
+      );
+      try {
+        saveDemoAdminAlerts(dataMode, updated);
+        setNotifications(updated);
+        setNotificationError(null);
+      } catch (error) {
+        setNotificationError(
+          error instanceof Error ? error.message : "Could not save the demo alert state.",
+        );
+      }
+      return;
+    }
     try {
       await notificationsApi.markAsRead(id);
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
       );
-    } catch {}
+    } catch (error) {
+      setNotificationError(
+        error instanceof Error ? error.message : "Could not mark this notification as read.",
+      );
+    }
   };
 
   const handleMarkAllRead = async () => {
     setMarkingAll(true);
+    if (demoSession) {
+      const updated = notifications.map((item) => ({ ...item, is_read: true }));
+      try {
+        saveDemoAdminAlerts(dataMode, updated);
+        setNotifications(updated);
+        setNotificationError(null);
+      } catch (error) {
+        setNotificationError(
+          error instanceof Error ? error.message : "Could not save the demo alert state.",
+        );
+      } finally {
+        setMarkingAll(false);
+      }
+      return;
+    }
     try {
       await notificationsApi.markAllRead();
       setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
-    } catch {
+    } catch (error) {
+      setNotificationError(
+        error instanceof Error ? error.message : "Could not mark notifications as read.",
+      );
     } finally {
       setMarkingAll(false);
     }
@@ -102,6 +191,9 @@ export default function Header() {
         <div ref={dropdownRef} className="relative">
           <button
             onClick={() => setDropdownOpen((prev) => !prev)}
+            aria-label={`Notifications, ${unreadCount} unread`}
+            aria-expanded={dropdownOpen}
+            aria-haspopup="dialog"
             className="w-7.5 h-7.5 relative rounded-[5px] bg-[#F5F5F5] flex justify-center items-center cursor-pointer hover:bg-[#EBEBEB] transition-colors"
           >
             <Bell className="w-5 h-5" />
@@ -113,7 +205,11 @@ export default function Header() {
           </button>
 
           {dropdownOpen && (
-            <div className="absolute right-0 top-10 z-50 w-[360px] bg-white border border-[#E6E6E6] rounded-[8px] shadow-lg overflow-hidden">
+            <div
+              role="dialog"
+              aria-label="Admin notifications"
+              className="absolute right-0 top-10 z-50 w-[360px] bg-white border border-[#E6E6E6] rounded-[8px] shadow-lg overflow-hidden"
+            >
               {/* Header */}
               <div className="flex items-center justify-between px-4 py-3 border-b border-[#F5F5F5]">
                 <span className="text-sm font-semibold text-[#212121]">
@@ -132,7 +228,12 @@ export default function Header() {
 
               {/* List */}
               <div className="max-h-[400px] overflow-y-auto">
-                {notifications.length === 0 ? (
+                {notificationError && (
+                  <p role="alert" className="border-b border-rose-100 bg-rose-50 px-4 py-2 text-xs text-rose-700">
+                    {notificationError}
+                  </p>
+                )}
+                {notifications.length === 0 && !notificationError ? (
                   <p className="py-10 text-center text-sm text-[#9E9E9E]">
                     No notifications
                   </p>
@@ -164,7 +265,7 @@ export default function Header() {
                         <button
                           onClick={() => handleMarkAsRead(item.id)}
                           className="shrink-0 mt-1 w-2 h-2 rounded-full bg-[#635BFF] cursor-pointer"
-                          title="Mark as read"
+                          aria-label={`Mark ${item.title || "notification"} as read`}
                         />
                       )}
                     </div>

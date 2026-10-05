@@ -1,26 +1,37 @@
 "use client";
 
 import React from "react";
-import Image from "next/image";
-import { contentMiniImg } from "@/lib/utils";
+
+type TopContent = {
+  id?: string | number;
+  title?: string;
+  views_count?: number;
+  content_type?: string;
+  owner_name?: string;
+};
 
 interface ContentsProps {
-  data?: any[] | null;
+  data?: TopContent[] | null;
 }
 
 const Contents = ({ data }: ContentsProps) => {
-  // Only map if data exists, otherwise show empty state or null
   if (!data) return null;
+  if (data.length === 0) {
+    return (
+      <p className="py-8 text-center text-sm text-muted-foreground">
+        No content yet. Sample content appears when sample data is enabled.
+      </p>
+    );
+  }
 
   return (
     <div className="w-full flex flex-col gap-6 py-4">
-      {data.map((item: any, i: number) => (
+      {data.map((item, i) => (
         <ContentItem
           key={item.id || i}
           title={item?.title}
           subtitle={`${item?.views_count ?? 0} views · ${item?.content_type ?? ""}`}
           poster={item?.owner_name}
-          image={null}
         />
       ))}
     </div>
@@ -33,13 +44,11 @@ export const ContentItem = ({
   title,
   subtitle,
   poster,
-  image,
   classname,
 }: {
-  title?: string;
+  title?: TopContent["title"];
   subtitle?: string;
-  poster?: string;
-  image?: string | null;
+  poster?: TopContent["owner_name"];
   classname?: string;
 }) => {
   return (

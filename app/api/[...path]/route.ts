@@ -38,6 +38,16 @@ export async function DELETE(
 }
 
 async function handleProxy(request: NextRequest, params: { path: string[] }) {
+  if (!API_BASE_URL) {
+    return NextResponse.json(
+      {
+        error:
+          "This screen still uses the legacy private API. Configure NEXT_PUBLIC_API_URL or migrate it to Supabase.",
+      },
+      { status: 503 },
+    );
+  }
+
   try {
     // remove the literal "proxy" segment if the client included it
     const segments = [...params.path];
@@ -46,9 +56,6 @@ async function handleProxy(request: NextRequest, params: { path: string[] }) {
     }
     const path = segments.join("/");
     const url = `${API_BASE_URL}/${path}/`;
-
-    // debug logging so we can see what we're fetching
-    console.log("proxy->", path, url);
 
     const searchParams = request.nextUrl.searchParams.toString();
     const fullUrl = searchParams ? `${url}?${searchParams}` : url;

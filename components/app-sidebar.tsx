@@ -9,32 +9,9 @@ import {
   Package,
   TrendingUp,
   Settings,
+  Bell,
 } from "lucide-react";
-import Image from "next/image";
 
-function ContentActiveIcon({ className }: { className?: string }) {
-  return (
-    <Image
-      src="/images/content-icon.svg"
-      alt="Content"
-      width={18}
-      height={18}
-      className={className}
-    />
-  );
-}
-
-function ContentInactiveIcon({ className }: { className?: string }) {
-  return (
-    <Image
-      src="/images/content-non-active-icon.svg"
-      alt="Content"
-      width={18}
-      height={18}
-      className={className}
-    />
-  );
-}
 // import {
 //   LayoutGrid,
 //   SquareUser,
@@ -59,7 +36,7 @@ import {
 } from "@/components/ui/sidebar";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { pearlyLogo } from "@/lib/utils";
+import { nanzyLogo } from "@/lib/utils";
 import { useEffect } from "react";
 import adminAuthApi, { AdminProfile } from "@/lib/auth";
 
@@ -67,12 +44,12 @@ export const navData = {
   user: {
     name: "John Doe",
     email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
+    avatar: "/images/user-avatar.svg",
   },
   teams: [
     {
-      name: "Pearly",
-      logo: pearlyLogo,
+      name: "Nanzy",
+      logo: nanzyLogo,
       url: "/dashboard",
     },
   ],
@@ -93,10 +70,9 @@ export const navData = {
       icon: Archive,
     },
     {
-      title: "Content",
+      title: "Notifications",
       url: "/content-management",
-      icon: ContentActiveIcon,
-      inactiveIcon: ContentInactiveIcon,
+      icon: Bell,
     },
     {
       title: "Payments",

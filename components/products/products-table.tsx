@@ -14,6 +14,8 @@ import { ProductList } from "@/types/product";
 interface ProductsTableProps {
   onViewDetails: (product: ProductList) => void;
   onDelete: (product: ProductList) => void;
+  onEdit?: (product: ProductList) => void;
+  demoProducts?: ProductList[];
 }
 
 const ThreeDots = () => (
@@ -30,19 +32,34 @@ function formatDate(iso: string) {
   return d.toLocaleDateString("en-GB").replace(/\//g, "-");
 }
 
-export default function ProductsTable({ onViewDetails, onDelete }: ProductsTableProps) {
+function formatPrice(price: string): string {
+  const amount = Number(price);
+  if (!Number.isFinite(amount)) return price;
+  return new Intl.NumberFormat("en-NG", {
+    style: "currency",
+    currency: "NGN",
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+export default function ProductsTable({
+  onViewDetails,
+  onDelete,
+  onEdit,
+  demoProducts,
+}: ProductsTableProps) {
   const [products, setProducts] = useState<ProductList[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setLoading(true);
-    productsApi
+    if (demoProducts) return;
+    void productsApi
       .list({ page_size: 50 })
       .then((res) => setProducts(res.data.data.results ?? []))
       .catch(() => setError("Failed to load products"))
       .finally(() => setLoading(false));
-  }, []);
+  }, [demoProducts]);
 
   const columns: ColumnDef<ProductList>[] = [
     {
@@ -63,7 +80,7 @@ export default function ProductsTable({ onViewDetails, onDelete }: ProductsTable
     {
       key: "price",
       header: "Price",
-      cell: (p) => <span className="text-muted-foreground">{p.price}</span>,
+      cell: (p) => <span className="text-muted-foreground">{formatPrice(p.price)}</span>,
     },
     {
       key: "inventory",
@@ -87,6 +104,9 @@ export default function ProductsTable({ onViewDetails, onDelete }: ProductsTable
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-40">
             <DropdownMenuItem onClick={() => onViewDetails(p)}>View Details</DropdownMenuItem>
+            {demoProducts && onEdit && (
+              <DropdownMenuItem onClick={() => onEdit(p)}>Edit</DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={() => onDelete(p)} className="text-destructive focus:text-destructive">
               Delete
             </DropdownMenuItem>
@@ -96,7 +116,7 @@ export default function ProductsTable({ onViewDetails, onDelete }: ProductsTable
     },
   ];
 
-  if (loading) {
+  if (loading && !demoProducts) {
     return <div className="py-12 text-center text-sm text-muted-foreground">Loading products...</div>;
   }
 
@@ -106,7 +126,7 @@ export default function ProductsTable({ onViewDetails, onDelete }: ProductsTable
 
   return (
     <DataTable<ProductList>
-      data={products}
+      data={demoProducts ?? products}
       columns={columns}
       getSearchText={(p) => p.creator_name + " " + p.title}
       getDate={(p) => {

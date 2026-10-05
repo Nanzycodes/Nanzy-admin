@@ -1,8 +1,15 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useSyncExternalStore } from "react";
 import { fetchAnalytics, fetchCustomerMetrics, fetchTopContent, fetchTopSellers } from "@/lib/analytics";
 import { TrendingUp, ChevronDown, ArrowUpRight, Calendar } from "lucide-react";
+import DemoAnalyticsDashboard from "@/components/analytics/demo-analytics-dashboard";
+import {
+  DemoDataMode,
+  getDemoDataMode,
+  isDemoSession,
+  subscribeToDemoSession,
+} from "@/lib/demo-mode";
 
 type Timeframe = "weekly" | "monthly" | "yearly";
 
@@ -187,7 +194,7 @@ function DonutChart({ customersPercent, sellersPercent }: { customersPercent: nu
   );
 }
 
-export default function AnalyticsDashboard() {
+function LiveAnalyticsDashboard() {
   const [topTab, setTopTab] = useState<"contents" | "sellers">("contents");
   const [analytics, setAnalytics] = useState<any>(null);
   const [metrics, setMetrics] = useState<any>(null);
@@ -446,5 +453,24 @@ export default function AnalyticsDashboard() {
 
       </div>
     </div>
+  );
+}
+
+export default function AnalyticsDashboard() {
+  const demoSession = useSyncExternalStore(
+    subscribeToDemoSession,
+    isDemoSession,
+    () => false,
+  );
+  const dataMode = useSyncExternalStore<DemoDataMode>(
+    subscribeToDemoSession,
+    getDemoDataMode,
+    () => "sample",
+  );
+
+  return demoSession ? (
+    <DemoAnalyticsDashboard dataMode={dataMode} />
+  ) : (
+    <LiveAnalyticsDashboard />
   );
 }

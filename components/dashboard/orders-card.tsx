@@ -4,9 +4,18 @@ import React, { useEffect, useState } from "react";
 import DashboardCardContainer from "./card-container";
 import { TealPackage } from "@/lib/utils";
 import apiClient from "@/lib/apiclient";
+import { getDemoDataMode, isDemoSession } from "@/lib/demo-mode";
+
+type OrderCardData = {
+  id: string;
+  customer?: string | { name?: string };
+  items?: Array<{ product?: { title?: string } }>;
+  total_amount?: string | number;
+  status?: string;
+};
 
 const OrdersCard = ({ className = "", orderId }: { className?: string; orderId?: string | null }) => {
-  const [order, setOrder] = useState<any>(null);
+  const [order, setOrder] = useState<OrderCardData | null>(null);
   const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -16,11 +25,23 @@ const OrdersCard = ({ className = "", orderId }: { className?: string; orderId?:
 
   useEffect(() => {
     if (!mounted || !orderId) return;
+    const currentOrderId = orderId;
 
     async function fetchOrderDetail() {
+      if (isDemoSession()) {
+        setOrder({
+          id: currentOrderId,
+          customer: { name: "Temitayo" },
+          items: [{ product: { title: "Handmade everyday tote" } }],
+          total_amount: "18600",
+          status: "PAID",
+        });
+        return;
+      }
+
       setLoading(true);
       try {
-        const res = await apiClient.get(`/admin/orders/${orderId}/`);
+        const res = await apiClient.get<{ data: OrderCardData }>(`/admin/orders/${currentOrderId}/`);
         setOrder(res.data?.data);
       } catch (err) {
         console.error("❌ OrdersCard: API Error:", err);
@@ -34,7 +55,20 @@ const OrdersCard = ({ className = "", orderId }: { className?: string; orderId?:
 
   if (!mounted) return null;
 
-  const customerName = order?.customer?.name || "---";
+  if (isDemoSession() && getDemoDataMode() === "empty" && !orderId) {
+    return (
+      <DashboardCardContainer cardTitle="Orders" titleIcon={TealPackage} className={`${className} h-fit`}>
+        <p className="py-6 text-center text-sm text-muted-foreground">
+          No orders yet. Sample orders appear when sample data is enabled.
+        </p>
+      </DashboardCardContainer>
+    );
+  }
+
+  const customerName =
+    typeof order?.customer === "string"
+      ? order.customer
+      : order?.customer?.name || "---";
   const productTitle = order?.items?.[0]?.product?.title || "General";
   const totalPrice = order?.total_amount || 0;
   const status = order?.status || "PENDING";
@@ -48,13 +82,13 @@ const OrdersCard = ({ className = "", orderId }: { className?: string; orderId?:
         <div className="flex justify-between items-center mb-2">
           <div className="min-w-0">
             <p className="text-[9px] text-[#9E9E9E] uppercase tracking-wide">
-              Order Id
+              Order Identity
             </p>
             <p className="font-bold text-sm text-[#1A1A1A] truncate max-w-[120px]">
               {order?.id ? order.id.split('-')[0].toUpperCase() : "---"}
             </p>
           </div>
-          <span className="bg-[#ECEBFF] text-[#5C59E8] text-[9px] px-2 py-0.5 rounded-[4px] font-bold uppercase">
+          <span className="bg-blue-500 text-[#5C59E8] text-[9px] px-2 py-0.5 rounded-[4px] font-bold uppercase">
             {status}
           </span>
         </div>
@@ -62,7 +96,7 @@ const OrdersCard = ({ className = "", orderId }: { className?: string; orderId?:
         {/* Divider - Minimal margin */}
         <div className="border-t border-[#F5F5F5] mb-2" />
 
-        <p className="text-[10px] font-bold text-[#1A1A1A] mb-2">Order details</p>
+        <p className="text-[10px] font-bold text-[#1A1A1A] mb-2">Order info</p>
 
         {/* 2x2 Details Grid - Reduced gap-y from 5 to 3 */}
         <div className="grid grid-cols-2 gap-y-3 pb-1">

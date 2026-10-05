@@ -1,36 +1,34 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Nanzy Marketplace Admin
 
-## Getting Started
+Nanzy is a Next.js admin dashboard for a buy-and-sell marketplace. It uses Supabase for optional hosted authentication and PostgreSQL data, and includes a credential-free demo mode for portfolio previews.
 
-First, run the development server:
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) and choose **Explore demo dashboard**. The dashboard has persistent sample-data and empty-state modes, plus a live, no-key read-only integration with JSONPlaceholder. Products, orders, users, payments, notifications, and analytics support demo workflows derived from browser-local records. Demo mode does not create an account or connect marketplace changes to a live backend.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Configure Supabase
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Supabase offers a free plan with hosted Auth and PostgreSQL; provider limits and terms can change. Create a Supabase project, then:
 
-## Learn More
+1. Copy `.env.example` to `.env.local`.
+2. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` from the project’s API settings. These are public client credentials; never put a service-role key in this Next.js app.
+3. Run [`supabase/schema.sql`](./supabase/schema.sql) in the Supabase SQL Editor.
+4. Create your first user in Supabase Auth.
+5. Grant that user admin access from the SQL Editor, replacing the email:
 
-To learn more about Next.js, take a look at the following resources:
+   ```sql
+   update auth.users
+   set raw_app_meta_data =
+     coalesce(raw_app_meta_data, '{}'::jsonb) || '{"role":"admin"}'::jsonb
+   where email = 'you@example.com';
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+6. Sign out and back in so Supabase issues a token with the new admin role.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Admin access is derived from Supabase `app_metadata`, which users cannot update themselves. Database access is guarded by row-level security (RLS). Review RLS policies before exposing real customer or order data.
 
-## Deploy on Vercel
+## Scripts
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `npm run dev` — local development
+- `npm run lint` — ESLint
+- `npm run build` — production build

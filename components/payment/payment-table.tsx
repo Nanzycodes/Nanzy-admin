@@ -32,6 +32,7 @@ const USER_TYPE_MAP: Record<PayoutRole, string> = {
 
 interface PaymentTableProps {
   role: PayoutRole;
+  demoTransactions?: Transaction[];
 }
 
 const FILTER_STATUSES: { label: string; value: TransactionStatus }[] = [
@@ -43,7 +44,7 @@ const FILTER_STATUSES: { label: string; value: TransactionStatus }[] = [
 
 const ITEMS_PER_PAGE = 7;
 
-export default function PaymentTable({ role }: PaymentTableProps) {
+export default function PaymentTable({ role, demoTransactions }: PaymentTableProps) {
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -85,6 +86,7 @@ export default function PaymentTable({ role }: PaymentTableProps) {
 
   useEffect(() => {
     async function fetchTransactions() {
+      if (demoTransactions !== undefined) return;
       setLoading(true);
       setError(null);
       try {
@@ -113,10 +115,33 @@ export default function PaymentTable({ role }: PaymentTableProps) {
         setLoading(false);
       }
     }
-    fetchTransactions();
-  }, [role, currentPage, search, filterStatus, dateFrom, dateTo]);
+    void fetchTransactions();
+  }, [role, currentPage, search, filterStatus, dateFrom, dateTo, demoTransactions]);
 
-  const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE));
+  const filteredDemoTransactions = demoTransactions
+    ?.filter((transaction) => transaction.wallet_id.includes(role))
+    .filter((transaction) => {
+      const matchesSearch = `${transaction.wallet_id} ${transaction.id} ${
+        transaction.reference ?? ""
+      } ${transaction.description ?? ""} ${formatTransactionType(transaction.transaction_type)}`
+        .toLowerCase()
+        .includes(search.toLowerCase());
+      const matchesStatus = !filterStatus || transaction.status === filterStatus;
+      const transactionDate = new Date(transaction.created_at);
+      const matchesFrom = !dateFrom || transactionDate >= dateFrom;
+      const matchesTo = !dateTo || transactionDate <= dateTo;
+      return matchesSearch && matchesStatus && matchesFrom && matchesTo;
+    });
+  const displayedTransactions =
+    filteredDemoTransactions === undefined
+      ? transactions
+      : filteredDemoTransactions.slice(
+          (currentPage - 1) * ITEMS_PER_PAGE,
+          currentPage * ITEMS_PER_PAGE,
+        );
+  const displayedTotal = filteredDemoTransactions?.length ?? totalCount;
+
+  const totalPages = Math.max(1, Math.ceil(displayedTotal / ITEMS_PER_PAGE));
 
   function getPageNumbers(): (number | "...")[] {
     const pages: (number | "...")[] = [];
@@ -137,16 +162,20 @@ export default function PaymentTable({ role }: PaymentTableProps) {
   function toggleRow(id: string) {
     setSelectedRows((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
       return next;
     });
   }
 
   function toggleAll() {
-    if (selectedRows.size === transactions.length) {
+    if (selectedRows.size === displayedTransactions.length) {
       setSelectedRows(new Set());
     } else {
-      setSelectedRows(new Set(transactions.map((t) => t.id)));
+      setSelectedRows(new Set(displayedTransactions.map((t) => t.id)));
     }
   }
 
@@ -260,7 +289,7 @@ export default function PaymentTable({ role }: PaymentTableProps) {
                 <th className="w-10 px-4 py-3 text-left">
                   <input
                     type="checkbox"
-                    checked={transactions.length > 0 && selectedRows.size === transactions.length}
+                    checked={displayedTransactions.length > 0 && selectedRows.size === displayedTransactions.length}
                     onChange={toggleAll}
                     className="rounded border-border"
                   />
@@ -288,14 +317,14 @@ export default function PaymentTable({ role }: PaymentTableProps) {
                     {error}
                   </td>
                 </tr>
-              ) : transactions.length === 0 ? (
+              ) : displayedTransactions.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground text-sm">
                     No transactions found.
                   </td>
                 </tr>
               ) : (
-                transactions.map((tx) => {
+                displayedTransactions.map((tx) => {
                   const formattedDate = (() => {
                     try {
                       return format(new Date(tx.created_at), "dd-MM-yyyy");
@@ -415,6 +444,7 @@ export default function PaymentTable({ role }: PaymentTableProps) {
       {detailTxId && (
         <TransactionDetailModal
           transactionId={detailTxId}
+          initialTransaction={demoTransactions?.find((transaction) => transaction.id === detailTxId)}
           onClose={() => setDetailTxId(null)}
         />
       )}

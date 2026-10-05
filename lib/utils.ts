@@ -6,7 +6,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 //images
-export { default as pearlyLogo } from "./../public/images/pearly logo.png";
+export const nanzyLogo = "/images/nanzy-logo.jpg";
 export { default as contentMiniImg } from "./../public/images/content-image.png";
 export { default as sellerMiniImg } from "./../public/images/seller-mini.png";
 

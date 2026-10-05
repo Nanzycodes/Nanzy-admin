@@ -7,29 +7,53 @@ import { ProductDetail } from "@/types/product";
 
 interface ProductDetailModalProps {
   productId: number | null;
+  initialProduct?: ProductDetail | null;
   isOpen: boolean;
   onClose: () => void;
 }
 
-export default function ProductDetailModal({ productId, isOpen, onClose }: ProductDetailModalProps) {
+export default function ProductDetailModal({
+  productId,
+  initialProduct,
+  isOpen,
+  onClose,
+}: ProductDetailModalProps) {
   const [product, setProduct] = useState<ProductDetail | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loadedProductId, setLoadedProductId] = useState<number | null>(null);
+  const [detailError, setDetailError] = useState(false);
   const [activeImage, setActiveImage] = useState(0);
 
   useEffect(() => {
     if (!isOpen || productId === null) return;
-    setLoading(true);
-    setProduct(null);
+    if (initialProduct) return;
+    let active = true;
     productsApi
       .retrieve(productId)
-      .then((res) => setProduct(res.data.data))
-      .finally(() => setLoading(false));
-  }, [isOpen, productId]);
+      .then((res) => {
+        if (!active) return;
+        setProduct(res.data.data);
+        setDetailError(false);
+      })
+      .catch(() => {
+        if (!active) return;
+        setProduct(null);
+        setDetailError(true);
+      })
+      .finally(() => {
+        if (active) setLoadedProductId(productId);
+      });
+    return () => {
+      active = false;
+    };
+  }, [isOpen, productId, initialProduct]);
 
   if (!isOpen) return null;
 
-  const images = product?.image ? [product.image] : [];
-  const tags = product?.tag_list ?? [];
+  const displayedProduct = initialProduct ?? product;
+  const loading =
+    !initialProduct && productId !== null && loadedProductId !== productId;
+  const images = displayedProduct?.image ? [displayedProduct.image] : [];
+  const tags = displayedProduct?.tag_list ?? [];
 
   return (
     <div
@@ -55,12 +79,12 @@ export default function ProductDetailModal({ productId, isOpen, onClose }: Produ
           <div className="py-16 text-center text-sm text-muted-foreground">Loading...</div>
         )}
 
-        {!loading && product && (
+        {!loading && displayedProduct && (
           <>
             {/* Product name */}
             <div className="mb-4">
               <p className="text-xs text-muted-foreground mb-0.5">Product name</p>
-              <p className="text-sm font-semibold text-foreground">{product.title}</p>
+              <p className="text-sm font-semibold text-foreground">{displayedProduct.title}</p>
             </div>
 
             {/* Image carousel */}
@@ -70,13 +94,20 @@ export default function ProductDetailModal({ productId, isOpen, onClose }: Produ
                   {images[activeImage] ? (
                     <img
                       src={images[activeImage]}
-                      alt={product.title}
+                      alt={displayedProduct.title}
                       className="w-full h-full object-cover"
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
                       No image
                     </div>
+                  )}
+                  {!loading && !displayedProduct && (
+                    <p role="alert" className="py-10 text-center text-sm text-destructive">
+                      {detailError
+                        ? "Could not load product details. Please close this dialog and try again."
+                        : "Product details are unavailable."}
+                    </p>
                   )}
                 </div>
                 {images.length > 1 && (
@@ -106,16 +137,23 @@ export default function ProductDetailModal({ productId, isOpen, onClose }: Produ
 
             {/* Info grid row 1 */}
             <div className="grid grid-cols-3 gap-x-4 gap-y-4 mb-4">
-              <InfoCell label="Seller" value={product.creator_name} />
-              <InfoCell label="Price" value={`₦${product.price}`} />
-              <InfoCell label="Date created" value={new Date(product.created_at).toLocaleDateString("en-GB").replace(/\//g, "-")} />
+              <InfoCell label="Seller" value={displayedProduct.creator_name} />
+              <InfoCell
+                label="Price"
+                value={new Intl.NumberFormat("en-NG", {
+                  style: "currency",
+                  currency: "NGN",
+                  maximumFractionDigits: 0,
+                }).format(Number(displayedProduct.price) || 0)}
+              />
+              <InfoCell label="Date created" value={new Date(displayedProduct.created_at).toLocaleDateString("en-GB").replace(/\//g, "-")} />
             </div>
 
             {/* Info grid row 2 */}
             <div className="grid grid-cols-3 gap-x-4 gap-y-4 mb-5">
-              <InfoCell label="Inventory" value={String(product.inventory)} />
-              <InfoCell label="Variants" value={product.variants.length > 0 ? String(product.variants.length) : "—"} />
-              <InfoCell label="Discount" value={product.discount ? `${product.discount}%` : "—"} />
+              <InfoCell label="Inventory" value={String(displayedProduct.inventory)} />
+              <InfoCell label="Variants" value={displayedProduct.variants.length > 0 ? String(displayedProduct.variants.length) : "—"} />
+              <InfoCell label="Discount" value={displayedProduct.discount ? `${displayedProduct.discount}%` : "—"} />
             </div>
 
             <hr className="border-border mb-5" />
@@ -123,7 +161,7 @@ export default function ProductDetailModal({ productId, isOpen, onClose }: Produ
             {/* Description */}
             <div className="mb-5">
               <p className="text-xs text-muted-foreground mb-1">Product description</p>
-              <p className="text-sm text-foreground leading-relaxed">{product.description}</p>
+              <p className="text-sm text-foreground leading-relaxed">{displayedProduct.description}</p>
             </div>
 
             {/* Tags */}

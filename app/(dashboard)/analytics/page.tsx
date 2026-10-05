@@ -9,7 +9,7 @@ export default function AnalyticsPage() {
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-foreground">Analytics</h1>
-        <p className="text-sm text-muted-foreground">Track growth of users and platform</p>
+        <p className="text-sm text-muted-foreground">Explore marketplace activity, performance, and operational trends</p>
       </div>
       <AnalyticsDashboard />
     </div>

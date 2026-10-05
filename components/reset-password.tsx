@@ -21,6 +21,7 @@ export default function ResetPasswordClient({ uid, token }: Props) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   const { control, handleSubmit } = useForm<FormValues>({
     defaultValues: { new_password: "", new_password_confirm: "" },
@@ -34,6 +35,7 @@ export default function ResetPasswordClient({ uid, token }: Props) {
 
     setIsLoading(true);
     setError("");
+    setSuccess("");
 
     try {
       const response = await adminAuthApi.resetPassword({
@@ -43,15 +45,15 @@ export default function ResetPasswordClient({ uid, token }: Props) {
         new_password_confirm: data.new_password_confirm,
       });
 
-      console.log("Reset password response:", response);
+      if (!response.success) {
+        setError(response.message);
+        return;
+      }
 
-      // if (response.uid && response.token) {
-      //   router.push("/sign-in");
-      // } else {
-      //   setError("Failed to reset password.");
-      // }
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Something went wrong");
+      setSuccess(response.message);
+      window.setTimeout(() => router.replace("/sign-in"), 1500);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to reset password.");
     } finally {
       setIsLoading(false);
     }
@@ -59,10 +61,6 @@ export default function ResetPasswordClient({ uid, token }: Props) {
 
   return (
     <>
-      {(!uid || !token) && (
-        <p className="text-red-500">⚠️ Invalid or missing reset link.</p>
-      )}
-
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
         <InputWrapper
           type="password"
@@ -77,11 +75,12 @@ export default function ResetPasswordClient({ uid, token }: Props) {
           control={control}
         />
 
-        <Button type="submit" disabled={isLoading || !uid || !token}>
+        <Button type="submit" disabled={isLoading}>
           {isLoading ? "Submitting..." : "Submit"}
         </Button>
       </form>
 
+      {success && <p className="mt-2 text-green-700">{success}</p>}
       {error && <p className="text-red-500 mt-2">{error}</p>}
     </>
   );
