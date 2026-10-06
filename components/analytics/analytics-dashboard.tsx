@@ -13,6 +13,45 @@ import {
 
 type Timeframe = "weekly" | "monthly" | "yearly";
 
+type MetricData = {
+  total?: number;
+  weekly_change?: number;
+  chart?: Array<{ count: number }>;
+};
+
+type AnalyticsSnapshot = {
+  user_distribution?: {
+    total_users?: number;
+    customers?: { count?: number };
+    sellers?: { count?: number };
+  };
+};
+
+type TopContentItem = {
+  content_type?: string;
+  caption?: string;
+  title?: string;
+  name?: string;
+  view_count?: number;
+  like_count?: number;
+  summary?: string;
+  active_participants_count?: number;
+  thumbnail?: string;
+  tags?: string;
+  author_name?: string;
+  creator_name?: string;
+  creator_image?: string;
+};
+
+type TopSellerItem = {
+  first_name?: string;
+  last_name?: string;
+  business_name?: string;
+  email?: string;
+  product_count?: number;
+  status?: string;
+};
+
 const TIMEFRAME_LABELS: Record<Timeframe, string> = {
   weekly: "This week",
   monthly: "This month",
@@ -23,7 +62,6 @@ function buildSmoothPath(
   pts: [number, number][],
   w: number,
   h: number,
-  close = false,
 ): { line: string; area: string } {
   if (pts.length < 2) return { line: "", area: "" };
   let line = `M ${pts[0][0]},${pts[0][1]}`;
@@ -86,13 +124,12 @@ function MetricCard({
 }: {
   label: string;
   metricKey: "users" | "uploads";
-  renderValue: (data: any) => string;
-  renderTrend: (data: any) => string;
+  renderValue: (data: MetricData | null | undefined) => string;
+  renderTrend: (data: MetricData | null | undefined) => string;
 }) {
   const [timeframe, setTimeframe] = useState<Timeframe>("weekly");
   const [tfOpen, setTfOpen] = useState(false);
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<MetricData | null | undefined>(undefined);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -104,14 +141,23 @@ function MetricCard({
   }, []);
 
   useEffect(() => {
-    setLoading(true);
-    fetchAnalytics(timeframe)
-      .then((res) => setData(res?.[metricKey] ?? null))
-      .catch(() => setData(null))
-      .finally(() => setLoading(false));
+    let active = true;
+    void (async () => {
+      try {
+        const res = await fetchAnalytics(timeframe);
+        if (!active) return;
+        setData(res?.[metricKey] ?? null);
+      } catch {
+        if (active) setData(null);
+      }
+    })();
+    return () => {
+      active = false;
+    };
   }, [timeframe, metricKey]);
 
   const chart = data?.chart ?? [];
+  const loading = data === undefined;
   const isUp = (val: number) => val >= 0;
   const change = data?.weekly_change ?? 0;
 
@@ -196,25 +242,33 @@ function DonutChart({ customersPercent, sellersPercent }: { customersPercent: nu
 
 function LiveAnalyticsDashboard() {
   const [topTab, setTopTab] = useState<"contents" | "sellers">("contents");
-  const [analytics, setAnalytics] = useState<any>(null);
-  const [metrics, setMetrics] = useState<any>(null);
-  const [topContent, setTopContent] = useState<any[]>([]);
-  const [topSellers, setTopSellers] = useState<any[]>([]);
+  const [analytics, setAnalytics] = useState<AnalyticsSnapshot | null>(null);
+  const [metrics, setMetrics] = useState<Record<string, MetricData> | null>(null);
+  const [topContent, setTopContent] = useState<TopContentItem[]>([]);
+  const [topSellers, setTopSellers] = useState<TopSellerItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setLoading(true);
+    let active = true;
+
     Promise.all([
       fetchAnalytics().catch(() => null),
       fetchCustomerMetrics().catch(() => null),
       fetchTopContent().catch(() => []),
       fetchTopSellers().catch(() => []),
     ]).then(([analyticsData, metricsData, contentData, sellersData]) => {
+      if (!active) return;
       setAnalytics(analyticsData);
       setMetrics(metricsData);
       setTopContent(contentData);
       setTopSellers(sellersData);
-    }).finally(() => setLoading(false));
+    }).finally(() => {
+      if (active) setLoading(false);
+    });
+
+    return () => {
+      active = false;
+    };
   }, []);
   
   const totalUsersCount = analytics?.user_distribution?.total_users ?? 0;
@@ -302,10 +356,11 @@ function LiveAnalyticsDashboard() {
               {topContent.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-4 text-center">No content found</p>
               ) : (
-                topContent.map((item: any, i: number) => {
-                  const isVideo = item.content_type === "video";
-                  const isArticle = item.content_type === "article";
-                  const isLivestream = item.content_type === "livestream";
+                topContent.map((item: TopContentItem, i: number) => {
+                  const contentType = item.content_type ?? "video";
+                  const isVideo = contentType === "video";
+                  const isArticle = contentType === "article";
+                  const isLivestream = contentType === "livestream";
 
                   const title = isVideo
                     ? item.caption
@@ -343,7 +398,7 @@ function LiveAnalyticsDashboard() {
                           <img src={image} alt={title} className="w-full h-full object-cover" />
                         ) : (
                           <span className="text-[10px] text-muted-foreground font-medium uppercase">
-                            {typeLabel[item.content_type] ?? "—"}
+                            {typeLabel[contentType] ?? "—"}
                           </span>
                         )}
                       </div>
@@ -358,7 +413,7 @@ function LiveAnalyticsDashboard() {
                           {isVideo ? item.tags || "—" : `By ${poster}`}
                         </p>
                         <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded">
-                          {typeLabel[item.content_type] ?? "—"}
+                          {typeLabel[contentType] ?? "—"}
                         </span>
                       </div>
                     </div>
@@ -374,7 +429,7 @@ function LiveAnalyticsDashboard() {
               {topSellers.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-4 text-center">No sellers found</p>
               ) : (
-                topSellers.map((seller: any, i: number) => (
+                topSellers.map((seller: TopSellerItem, i: number) => (
                   <div key={i} className="flex items-center gap-3 py-3">
                     <div className="w-10 h-10 rounded-full bg-primary/10 shrink-0 flex items-center justify-center text-xs font-medium text-primary">
                       {seller.first_name?.charAt(0).toUpperCase() ?? "?"}

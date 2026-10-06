@@ -14,6 +14,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import apiClient from "@/lib/apiclient";
 import { toOrderList } from "@/lib/demo-orders";
+import { downloadCSV } from "@/lib/csv";
 
 interface OrdersTableProps {
   onViewDetails: (order: OrderDetail) => void;
@@ -195,6 +196,24 @@ export default function OrdersTable({
     return pages;
   }
 
+  function handleExport() {
+    if (displayedOrders.length === 0) return;
+
+    const rows = displayedOrders.map((order) => ({
+      ID: order.id,
+      Customer: order.customer,
+      Status: order.status,
+      "Item Count": order.items_count,
+      Date: (() => {
+        const d = new Date(order.created_at);
+        return Number.isNaN(d.getTime()) ? "—" : format(d, "yyyy-MM-dd");
+      })(),
+      Amount: order.total_amount,
+    }));
+
+    downloadCSV("orders.csv", rows);
+  }
+
   return (
     <div>
       {/* ── Stat cards with YOUR original SVG icons ── */}
@@ -343,6 +362,15 @@ export default function OrdersTable({
               <CalendarComponent mode="single" selected={dateTo} onSelect={(date) => setDateTo(date)} initialFocus />
             </PopoverContent>
           </Popover>
+
+          <button
+            type="button"
+            onClick={handleExport}
+            disabled={loading || displayedOrders.length === 0}
+            className="inline-flex items-center justify-center rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Export CSV
+          </button>
         </div>
 
         {/* ── Table ── */}
