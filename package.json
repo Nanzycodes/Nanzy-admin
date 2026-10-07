@@ -47,13 +47,13 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Qudra-IO/pearly-admin.git"
+    "url": "git+https://github.com/Nanzy-codes/nanzy-admin.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/Qudra-IO/pearly-admin/issues"
+    "url": "https://github.com/Nanzy-codes/nanzy-admin/issues"
   },
-  "homepage": "https://github.com/Qudra-IO/pearly-admin#readme"
+  "homepage": " "
 }

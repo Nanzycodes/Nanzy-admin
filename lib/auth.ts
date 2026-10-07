@@ -114,7 +114,7 @@ export const adminAuthApi = {
       return {
         success: false,
         message:
-          "This account does not have the admin role. Ask a project owner to grant admin access in Supabase.",
+          "This account does not have the admin role. Ask Admin Nanzy to grant admin access in Supabase.",
       };
     }
 

@@ -12,19 +12,34 @@ interface CollectionDetailModalProps {
 }
 
 export default function CollectionDetailModal({ item, isOpen, onClose }: CollectionDetailModalProps) {
-  const [content, setContent] = useState<ContentItem | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<{
+    key: string;
+    content: ContentItem | null;
+  } | null>(null);
+  const contentType = item?.content_type;
+  const itemId = item?.id;
+  const itemKey =
+    contentType && itemId !== undefined ? `${contentType}:${itemId}` : null;
+  const content = itemKey && result?.key === itemKey ? result.content : null;
+  const loading = isOpen && itemKey !== null && result?.key !== itemKey;
 
   useEffect(() => {
-    if (!isOpen || !item) return;
-    setLoading(true);
-    setContent(null);
+    if (!isOpen || !contentType || itemId === undefined || !itemKey) return;
+    let active = true;
     collectionsApi
-      .retrieve(item.content_type, item.id)
-      .then((res) => setContent(res.data.data))
-      .catch(() => setContent(null))
-      .finally(() => setLoading(false));
-  }, [isOpen, item]);
+      .retrieve(contentType, itemId)
+      .then((res) => {
+        if (active) {
+          setResult({ key: itemKey, content: res.data.data });
+        }
+      })
+      .catch(() => {
+        if (active) setResult({ key: itemKey, content: null });
+      });
+    return () => {
+      active = false;
+    };
+  }, [isOpen, contentType, itemId, itemKey]);
 
   if (!isOpen) return null;
 

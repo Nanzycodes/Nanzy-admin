@@ -227,7 +227,7 @@ const Page = () => {
 
       {demoSession && (
         <p className="border-b border-border bg-amber-50 px-4 py-2 text-xs text-amber-900">
-          Demo product changes are saved in this browser and are not sent to marketplace services.
+          Demo product changes are saved in this browser.
         </p>
       )}
       {demoProductsError && (

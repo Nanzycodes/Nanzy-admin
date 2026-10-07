@@ -153,10 +153,10 @@ export function getDemoOrders(mode: "sample" | "empty"): OrderDetail[] {
   try {
     saved = JSON.parse(serialized);
   } catch {
-    throw new Error("Saved demo orders are invalid JSON. Clear this mode's demo data to continue.");
+    throw new Error("Saved demo orders are invalid JSON");
   }
   if (!Array.isArray(saved) || !saved.every(isOrderDetail)) {
-    throw new Error("Saved demo orders have an invalid structure. Clear this mode's demo data to continue.");
+    throw new Error("Saved demo orders have an invalid Json.");
   }
   if (mode === "empty") return saved;
 

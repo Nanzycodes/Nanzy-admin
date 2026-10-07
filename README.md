@@ -1,6 +1,7 @@
 # Nanzy Marketplace Admin
 Nanzy is a Next.js admin dashboard for a buy-and-sell marketplace. It uses Supabase for optional hosted authentication and PostgreSQL data, and includes a credential-free demo mode for portfolio previews.
 
+For a project-specific, file-by-file learning plan with exercises and interview explanations, see [LEARNING-GUIDE.md](./LEARNING-GUIDE.md).
 
 
 Open [http://localhost:3000](http://localhost:3000) and choose **Explore demo dashboard**. The dashboard has persistent sample-data and empty-state modes, plus a live, no-key read-only integration with JSONPlaceholder. Products, orders, users, payments, notifications, and analytics support demo workflows derived from browser-local records. Demo mode does not create an account or connect marketplace changes to a live backend.
