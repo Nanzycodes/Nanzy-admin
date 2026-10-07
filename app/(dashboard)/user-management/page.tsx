@@ -244,7 +244,7 @@ export default function UsersPage() {
 
       {demoSession && (
         <p className="mb-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          Demo users are saved in this browser only. New-user passwords are used for form validation and are never saved or sent.
+          Demo users are saved in this browser only.
         </p>
       )}
       {demoUsersError && (

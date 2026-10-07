@@ -132,10 +132,10 @@ export function getDemoTransactions(mode: "sample" | "empty"): Transaction[] {
   try {
     saved = JSON.parse(serialized);
   } catch {
-    throw new Error("Saved demo transactions are invalid JSON. Clear this mode's demo data to continue.");
+    throw new Error("Saved demo transactions are invalid transaction.");
   }
   if (!Array.isArray(saved) || !saved.every(isTransaction)) {
-    throw new Error("Saved demo transactions have an invalid structure. Clear this mode's demo data to continue.");
+    throw new Error("QUick reminder:This is a demo mode.");
   }
   return saved;
 }

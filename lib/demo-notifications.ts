@@ -284,10 +284,10 @@ export function getDemoAdminAlerts(mode: "sample" | "empty"): Notification[] {
   try {
     saved = JSON.parse(serialized);
   } catch {
-    throw new Error("Saved demo alerts are invalid JSON. Clear this mode's demo data to continue.");
+    throw new Error("Saved demo alerts are invalid JSON.");
   }
   if (!Array.isArray(saved) || !saved.every(isAdminAlert)) {
-    throw new Error("Saved demo alerts have an invalid structure. Clear this mode's demo data to continue.");
+    throw new Error("saved data for demo alerts not a real data.for real data we will have to use real APIA");
   }
   return saved;
 }
