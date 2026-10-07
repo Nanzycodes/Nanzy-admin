@@ -34,6 +34,27 @@ type TopPerformers = {
   }>;
 };
 
+const recentActivity = [
+{
+  title: "New order received",
+  detail: "Order #1048 was paid for by Temitayo",
+  time: "12 min ago",
+  tone: "bg-emerald-100 text-emerald-700",
+},
+{
+  title: "Seller inventory alert",
+  detail: "Botanical soy candle stock dropped below 10 units",
+  time: "46 min ago",
+  tone: "bg-amber-100 text-amber-700",
+},
+{
+  title: "New seller added",
+  detail: "Mina Studio launched a new linen collection",
+  time: "1 hr ago",
+  tone: "bg-sky-100 text-sky-700",
+},
+];
+
 function Page() {
   const demoDataMode = useSyncExternalStore(
     subscribeToDemoSession,
@@ -192,7 +213,35 @@ function Page() {
           />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+        <div className="mt-6 rounded-[10px] border border-border bg-white p-4 shadow-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-[#1A1A1A]">Recent activity</p>
+              <p className="text-xs text-[#616161]">Latest marketplace actions across your admin workspace</p>
+            </div>
+            <button type="button" className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-[#424242] hover:bg-[#F5F5F5]">
+              View all
+            </button>
+          </div>
+          <div className="space-y-3">
+            {recentActivity.map((item) => (
+              <div key={item.title} className="flex items-start gap-3 rounded-[8px] border border-[#F1F1F1] bg-[#F9F9F9] p-3">
+                <span className={`mt-0.5 inline-flex h-2.5 w-2.5 rounded-full ${item.tone.replace("text-", "bg-").split(" ")[0]}`} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-medium text-[#1A1A1A]">{item.title}</p>
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${item.tone}`}>
+                      {item.time}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-[#616161]">{item.detail}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch mt-6">
           <div className="lg:col-span-2">
             <PerformanceCard className="h-full" topPerformers={topPerformers} />
           </div>

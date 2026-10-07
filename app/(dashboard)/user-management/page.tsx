@@ -50,6 +50,9 @@ export default function UsersPage() {
 
   const [pendingUsers, setPendingUsers] = useState(0);
   const [pendingSinceLastWeek, setPendingSinceLastWeek] = useState(0);
+  const [suspendedUsers, setSuspendedUsers] = useState(0);
+  const [inactiveUsers, setInactiveUsers] = useState(0);
+  const [statsError, setStatsError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!demoSession) return;
@@ -84,27 +87,52 @@ export default function UsersPage() {
           activeRes,
           activeLastWeekRes,
           pendingRes,
-          pendingLastWeekRes
+          pendingLastWeekRes,
+          suspendedRes,
+          inactiveRes,
         ] = await Promise.all([
           apiClient.get(`/admin/customers/?page_size=1`),
-          apiClient.get(`/admin/customers/?created_after=${lastMonth}&page_size=1`),
+          apiClient.get(`/admin/customers/?start_date=${lastMonth}&page_size=1`),
           apiClient.get(`/admin/customers/?status=active&page_size=1`),
-          apiClient.get(`/admin/customers/?status=active&created_after=${lastWeek}&page_size=1`),
+          apiClient.get(`/admin/customers/?status=active&start_date=${lastWeek}&page_size=1`),
           apiClient.get(`/admin/customers/?status=pending&page_size=1`),
-          apiClient.get(`/admin/customers/?status=pending&created_after=${lastWeek}&page_size=1`)
+          apiClient.get(`/admin/customers/?status=pending&start_date=${lastWeek}&page_size=1`),
+          apiClient.get(`/admin/customers/?status=suspended&page_size=1`),
+          apiClient.get(`/admin/customers/?status=inactive&page_size=1`),
         ]);
 
-        // Safely extract counts based on our nested data discovery
-        setTotalUsers(totalRes.data?.data?.count ?? 0);
-        setUsersSinceLastMonth(totalLastMonthRes.data?.data?.count ?? 0);
+        function countFrom(response: { data?: unknown }): number {
+          const root = response.data;
+          const payload =
+            typeof root === "object" && root !== null && "data" in root
+              ? root.data
+              : root;
+          if (
+            typeof payload !== "object" ||
+            payload === null ||
+            !("count" in payload) ||
+            typeof payload.count !== "number" ||
+            !Number.isFinite(payload.count)
+          ) {
+            throw new Error("The users API returned an invalid summary count.");
+          }
+          return payload.count;
+        }
 
-        setActiveUsers(activeRes.data?.data?.count ?? 0);
-        setActiveSinceLastWeek(activeLastWeekRes.data?.data?.count ?? 0);
+        setTotalUsers(countFrom(totalRes));
+        setUsersSinceLastMonth(countFrom(totalLastMonthRes));
 
-        setPendingUsers(pendingRes.data?.data?.count ?? 0);
-        setPendingSinceLastWeek(pendingLastWeekRes.data?.data?.count ?? 0);
-      } catch {
-        // silently fail
+        setActiveUsers(countFrom(activeRes));
+        setActiveSinceLastWeek(countFrom(activeLastWeekRes));
+
+        setPendingUsers(countFrom(pendingRes));
+        setPendingSinceLastWeek(countFrom(pendingLastWeekRes));
+        setSuspendedUsers(countFrom(suspendedRes));
+        setInactiveUsers(countFrom(inactiveRes));
+        setStatsError(null);
+      } catch (error) {
+        console.error("Failed to load user summary:", error);
+        setStatsError("Could not load user summary counts. Please try again.");
       }
     }
     fetchCounts();
@@ -186,6 +214,10 @@ export default function UsersPage() {
     statsUsers?.filter(
       (user) => user.status === "pending" && new Date(user.date_joined) >= subDays(new Date(), 7),
     ).length ?? pendingSinceLastWeek;
+  const suspendedUsersValue =
+    statsUsers?.filter((user) => user.status === "suspended").length ?? suspendedUsers;
+  const inactiveUsersValue =
+    statsUsers?.filter((user) => user.status === "inactive").length ?? inactiveUsers;
 
   return (
     <div>
@@ -220,6 +252,11 @@ export default function UsersPage() {
           {demoUsersError}
         </p>
       )}
+      {statsError && !demoSession && (
+        <p role="alert" className="mb-5 rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {statsError}
+        </p>
+      )}
 
       {/* ── Tabs ── */}
       <div className="flex gap-1 mb-6 border-b border-border">
@@ -239,21 +276,31 @@ export default function UsersPage() {
       </div>
 
       {/* ── Stat cards ── */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 gap-4 mb-6 sm:grid-cols-2 xl:grid-cols-5">
         <StatCard 
           label="Total Users" 
           value={totalUsersValue}
-          trend={`${usersSinceLastMonthValue.toLocaleString()} since last month`}
+          description={`${usersSinceLastMonthValue.toLocaleString()} joined in the last month`}
         />
         <StatCard 
           label="Active Users" 
           value={activeUsersValue}
-          trend={`${activeSinceLastWeekValue.toLocaleString()} since last week`}
+          description={`${activeSinceLastWeekValue.toLocaleString()} of ${activeUsersValue.toLocaleString()} joined in the last 7 days`}
         />
         <StatCard 
           label="Pending Users" 
           value={pendingUsersValue}
-          trend={`${pendingSinceLastWeekValue.toLocaleString()} since last week`}
+          description={`${pendingSinceLastWeekValue.toLocaleString()} of ${pendingUsersValue.toLocaleString()} joined in the last 7 days`}
+        />
+        <StatCard
+          label="Suspended Users"
+          value={suspendedUsersValue}
+          description="Current status total"
+        />
+        <StatCard
+          label="Inactive Users"
+          value={inactiveUsersValue}
+          description="Current status total"
         />
       </div>
 
@@ -315,23 +362,18 @@ export default function UsersPage() {
 }
 
 // ── Stat card component ──
-function StatCard({ label, value, trend }: {
+function StatCard({ label, value, description }: {
   label: string;
   value: number;
-  trend: string;
+  description: string;
 }) {
   return (
     <div className="bg-white rounded-xl border border-border p-5">
       <p className="text-sm font-medium text-foreground mb-2">{label}</p>
-      <div className="flex items-center gap-2 mb-4">
-        <span className="text-xs text-muted-foreground">{trend}</span>
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-          <path d="M5 1L9.33013 8.5H0.669873L5 1Z" fill="#22C55E" />
-        </svg>
-      </div>
       <p className="text-3xl font-bold text-foreground">
         {value.toLocaleString()}
       </p>
+      <p className="mt-2 text-xs text-muted-foreground">{description}</p>
     </div>
   );
 }

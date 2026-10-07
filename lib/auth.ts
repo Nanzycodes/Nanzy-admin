@@ -73,6 +73,24 @@ function configurationError(): Error {
   );
 }
 
+function getPasswordResetRedirectUrl(): string {
+  const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  const siteUrl = configuredSiteUrl || window.location.origin;
+  let url: URL;
+
+  try {
+    url = new URL(siteUrl);
+  } catch {
+    throw new Error("NEXT_PUBLIC_SITE_URL must be an absolute URL.");
+  }
+
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    throw new Error("NEXT_PUBLIC_SITE_URL must use HTTP or HTTPS.");
+  }
+
+  return `${url.origin}/reset-password`;
+}
+
 function getMetadataString(
   metadata: Record<string, unknown>,
   key: string,
@@ -120,7 +138,7 @@ export const adminAuthApi = {
     if (!supabase) throw configurationError();
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: getPasswordResetRedirectUrl(),
     });
     return error
       ? { success: false, message: error.message }

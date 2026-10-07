@@ -6,7 +6,7 @@ import { SidebarTrigger } from "./ui/sidebar";
 import { usePathname } from "next/navigation";
 import { navData } from "./app-sidebar";
 import { userAvatar } from "@/lib/utils";
-import { Bell, Box } from "lucide-react";
+import { Box, UserRound } from "lucide-react";
 import notificationsApi, { Notification } from "@/lib/notifications-api";
 import { formatDistanceToNow } from "date-fns";
 import {
@@ -42,6 +42,33 @@ function parseNotifications(payload: unknown): Notification[] {
     throw new Error("The notification service returned an invalid response.");
   }
   return items;
+}
+
+function NotificationBellIcon({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className={className}
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M8.5 15.5V10.5C8.5 7.96 10.46 6 13 6C15.54 6 17.5 7.96 17.5 10.5V15.5L19.2 17.2C19.48 17.48 19.25 18 18.85 18H7.15C6.75 18 6.52 17.48 6.8 17.2L8.5 15.5Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M11 18.75C11.64 19.5 12.36 19.5 13 18.75"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+      <circle cx="16.8" cy="7.2" r="2.2" fill="#635BFF" opacity="0.9" />
+    </svg>
+  );
 }
 
 export default function Header() {
@@ -194,11 +221,11 @@ export default function Header() {
             aria-label={`Notifications, ${unreadCount} unread`}
             aria-expanded={dropdownOpen}
             aria-haspopup="dialog"
-            className="w-7.5 h-7.5 relative rounded-[5px] bg-[#F5F5F5] flex justify-center items-center cursor-pointer hover:bg-[#EBEBEB] transition-colors"
+            className="relative flex h-9 w-9 items-center justify-center rounded-[8px] border border-[#E9E7FF] bg-[#F5F3FF] text-[#2F2B45] transition-colors hover:bg-[#EEEAFE]"
           >
-            <Bell className="w-5 h-5" />
+            <NotificationBellIcon className="h-5 w-5" />
             {unreadCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-0.5 flex items-center justify-center rounded-full bg-red-500 text-white text-[9px] font-bold leading-none">
+              <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#635BFF] px-1 text-[9px] font-bold leading-none text-white shadow-sm">
                 {unreadCount > 99 ? "99+" : unreadCount}
               </span>
             )}
@@ -276,15 +303,25 @@ export default function Header() {
           )}
         </div>
 
-        {/* Avatar */}
-        <div className="w-7.5 h-7.5 relative rounded-[5px] bg-[#F5F5F5] overflow-hidden">
-          <Image
-            src={userImage || userAvatar}
-            alt="Preview"
-            fill
-            style={{ objectFit: "contain" }}
-          />
-        </div>
+        {/* Profile */}
+        <button
+          type="button"
+          aria-label="User profile"
+          className="flex h-9 w-9 items-center justify-center rounded-[8px] border border-[#E9E7FF] bg-[#F5F3FF] text-[#2F2B45] transition-colors hover:bg-[#EEEAFE]"
+        >
+          {userImage ? (
+            <div className="relative h-7 w-7 overflow-hidden rounded-[6px]">
+              <Image
+                src={userImage}
+                alt="User profile"
+                fill
+                style={{ objectFit: "cover" }}
+              />
+            </div>
+          ) : (
+            <UserRound className="h-5 w-5" />
+          )}
+        </button>
       </div>
     </header>
   );

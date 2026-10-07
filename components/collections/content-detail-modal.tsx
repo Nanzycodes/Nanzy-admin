@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import Image from "next/image";
 import { X, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import apiClient from "@/lib/apiclient";
@@ -13,7 +14,7 @@ interface ContentDetailModalProps {
 }
 
 /** Extract display fields from a raw API content item */
-function parseContent(item: any, contentType: ContentType) {
+function parseContent(item: Record<string, unknown>, contentType: ContentType) {
   let title = "—";
   let creator = "—";
   let caption = "";
@@ -21,37 +22,44 @@ function parseContent(item: any, contentType: ContentType) {
   let images: string[] = [];
 
   if (contentType === "article") {
-    title = item.title || "—";
-    creator = item.author_name || "—";
-    caption = item.summary || "";
-    description = item.article_content || "";
-    if (item.thumbnail) images.push(item.thumbnail);
+    title = (item.title as string) || "—";
+    creator = (item.author_name as string) || "—";
+    caption = (item.summary as string) || "";
+    description = (item.article_content as string) || "";
+    if (item.thumbnail) images.push(String(item.thumbnail));
   } else if (contentType === "livestream") {
-    title = item.name || "—";
-    creator = item.creator_name || "—";
-    // Collect product images as carousel
+    title = (item.name as string) || "—";
+    creator = (item.creator_name as string) || "—";
     if (Array.isArray(item.products)) {
       images = item.products
-        .map((p: any) => p.product_details?.image)
+        .map((p) => {
+          const product = p as Record<string, unknown>;
+          return typeof product.product_details === "object" && product.product_details !== null
+            ? String((product.product_details as Record<string, unknown>).image ?? "")
+            : "";
+        })
         .filter(Boolean);
     }
-    // Fall back to creator image
     if (images.length === 0 && item.creator_image) {
-      images.push(item.creator_image);
+      images.push(String(item.creator_image));
     }
-    // Build product description
     if (Array.isArray(item.products) && item.products.length > 0) {
       description = item.products
-        .map((p: any) => `${p.product_details?.title} — ₦${parseFloat(p.starting_bid_price ?? 0).toLocaleString()}`)
+        .map((p) => {
+          const product = p as Record<string, unknown>;
+          const productDetails = typeof product.product_details === "object" && product.product_details !== null
+            ? (product.product_details as Record<string, unknown>)
+            : {};
+          const price = product.starting_bid_price ?? 0;
+          return `${String(productDetails.title ?? "Product")} — ₦${Number(price ?? 0).toLocaleString()}`;
+        })
         .join("\n");
     }
   } else {
-    // video / influencer_content
-    title = item.caption || "—";
-    creator = item.creator_name || "—";
-    caption = item.tags || "";
-    if (item.thumbnail) images.push(item.thumbnail);
-    // Note: item.video is an .mp4 URL — handled separately
+    title = (item.caption as string) || "—";
+    creator = (item.creator_name as string) || "—";
+    caption = (item.tags as string) || "";
+    if (item.thumbnail) images.push(String(item.thumbnail));
   }
 
   return { title, creator, caption, description, images, raw: item };
@@ -62,7 +70,7 @@ export default function ContentDetailModal({
   contentId,
   onClose,
 }: ContentDetailModalProps) {
-  const [raw, setRaw] = useState<any | null>(null);
+  const [raw, setRaw] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [imgIndex, setImgIndex] = useState(0);
@@ -90,7 +98,7 @@ export default function ContentDetailModal({
     setFlagging(true);
     try {
       await apiClient.patch(`/admin/content/${contentType}/${contentId}/flag/`);
-      setRaw((prev: any) => ({ ...prev, status: "flagged" }));
+      setRaw((prev) => (prev ? { ...prev, status: "flagged" } : prev));
     } catch {
       // flag endpoint may not yet be live
     } finally {
@@ -103,15 +111,17 @@ export default function ContentDetailModal({
     title: "—", creator: "—", caption: "", description: "", images: [],
   };
 
-  const status = raw?.status ?? null;
+  const status = typeof raw?.status === "string" ? raw.status : null;
   const isFlagged = status?.toLowerCase() === "flagged";
   const isVideo = contentType === "video" || contentType === "influencer_content";
-  const videoUrl = isVideo ? raw?.video ?? null : null;
+  const videoUrl = isVideo ? (typeof raw?.video === "string" ? raw.video : null) : null;
 
   const dateStr = (() => {
     if (!raw) return "—";
-    try { return format(new Date(raw.created_at), "dd-MM-yyyy"); }
-    catch { return raw.created_at; }
+    const createdAt = raw.created_at;
+    if (typeof createdAt !== "string" && !(createdAt instanceof Date)) return "—";
+    try { return format(new Date(createdAt), "dd-MM-yyyy"); }
+    catch { return typeof createdAt === "string" ? createdAt : "—"; }
   })();
 
   return (
@@ -170,12 +180,15 @@ export default function ContentDetailModal({
                         style={{ aspectRatio: "4/3" }}
                         onClick={() => setImgIndex(i)}
                       >
-                        <img
+                        <Image
                           src={src}
                           alt={`media-${i}`}
-                          className="w-full h-full object-cover"
+                          width={800}
+                          height={600}
+                          className="h-full w-full object-cover"
                           onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = "none";
+                            const target = e.currentTarget as HTMLImageElement;
+                            target.style.display = "none";
                           }}
                         />
                       </div>

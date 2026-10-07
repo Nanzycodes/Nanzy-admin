@@ -16,7 +16,7 @@ const tabs: SettingsTab[] = [
   "logout",
 ];
 
-const page = () => {
+const Page = () => {
   const [activeTab, setActiveTab] = useState<SettingsTab>("account");
 
   return (
@@ -55,4 +55,4 @@ const page = () => {
   );
 };
 
-export default page;
+export default Page;
