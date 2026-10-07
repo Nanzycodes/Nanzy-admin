@@ -1,7 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import { useState, useEffect, useRef, useSyncExternalStore } from "react";
-import { fetchAnalytics, fetchCustomerMetrics, fetchTopContent, fetchTopSellers } from "@/lib/analytics";
+import { fetchAnalytics, fetchTopContent, fetchTopSellers } from "@/lib/analytics";
 import { TrendingUp, ChevronDown, ArrowUpRight, Calendar } from "lucide-react";
 import DemoAnalyticsDashboard from "@/components/analytics/demo-analytics-dashboard";
 import {
@@ -243,7 +244,6 @@ function DonutChart({ customersPercent, sellersPercent }: { customersPercent: nu
 function LiveAnalyticsDashboard() {
   const [topTab, setTopTab] = useState<"contents" | "sellers">("contents");
   const [analytics, setAnalytics] = useState<AnalyticsSnapshot | null>(null);
-  const [metrics, setMetrics] = useState<Record<string, MetricData> | null>(null);
   const [topContent, setTopContent] = useState<TopContentItem[]>([]);
   const [topSellers, setTopSellers] = useState<TopSellerItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -253,13 +253,11 @@ function LiveAnalyticsDashboard() {
 
     Promise.all([
       fetchAnalytics().catch(() => null),
-      fetchCustomerMetrics().catch(() => null),
       fetchTopContent().catch(() => []),
       fetchTopSellers().catch(() => []),
-    ]).then(([analyticsData, metricsData, contentData, sellersData]) => {
+    ]).then(([analyticsData, contentData, sellersData]) => {
       if (!active) return;
       setAnalytics(analyticsData);
-      setMetrics(metricsData);
       setTopContent(contentData);
       setTopSellers(sellersData);
     }).finally(() => {
@@ -360,7 +358,6 @@ function LiveAnalyticsDashboard() {
                   const contentType = item.content_type ?? "video";
                   const isVideo = contentType === "video";
                   const isArticle = contentType === "article";
-                  const isLivestream = contentType === "livestream";
 
                   const title = isVideo
                     ? item.caption
@@ -395,7 +392,13 @@ function LiveAnalyticsDashboard() {
                     <div key={i} className="flex items-center gap-3 py-3">
                       <div className="w-10 h-10 rounded-lg shrink-0 overflow-hidden bg-muted flex items-center justify-center">
                         {image ? (
-                          <img src={image} alt={title} className="w-full h-full object-cover" />
+                          <Image
+                            src={image}
+                            alt={title || "Content cover"}
+                            width={40}
+                            height={40}
+                            className="h-full w-full object-cover"
+                          />
                         ) : (
                           <span className="text-[10px] text-muted-foreground font-medium uppercase">
                             {typeLabel[contentType] ?? "—"}

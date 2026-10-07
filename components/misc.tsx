@@ -21,7 +21,3 @@ export const OverviewWithTime = ({ label, value, trend }: OverviewWithTimeProps)
     </div>
   );
 };
-
-export const DateDropdown = () => {
-  return <div>misc</div>;
-};

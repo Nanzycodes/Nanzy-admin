@@ -3,6 +3,7 @@ name: Staging CI
 on:
   push:
     branches: [ dev ]
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
@@ -35,6 +36,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Normalize image repo name
+        id: image
+        shell: bash
+        run: |
+          echo "name=$(echo '${{ env.IMAGE_NAME }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
       - name: Log in to Container registry
         uses: docker/login-action@v3
         with:
@@ -46,7 +53,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}
           tags: |
             type=ref,event=branch
             type=sha,prefix={{branch}}-
@@ -99,7 +106,7 @@ jobs:
       - name: Push Docker image to registry
         if: success()
         run: |
-          IMAGE_NAME_LOWER=$(echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE_NAME_LOWER="${{ env.REGISTRY }}/${{ steps.image.outputs.name }}"
           echo "Pushing image tags:"
           echo "${{ steps.meta.outputs.tags }}" | tr ',' '\n'
           docker push --all-tags "$IMAGE_NAME_LOWER"
