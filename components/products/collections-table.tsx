@@ -177,18 +177,43 @@ export default function CollectionsTable({ onViewDetails, onDelete, onContentTyp
     setActiveType(type);
     onContentTypeChange?.(type);
   }
-  const [items, setItems] = useState<ContentItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{
+    contentType: ContentType;
+    items: ContentItem[];
+  } | null>(null);
+  const [loadError, setLoadError] = useState<{
+    contentType: ContentType;
+    message: string;
+  } | null>(null);
+  const loading =
+    result?.contentType !== activeType && loadError?.contentType !== activeType;
+  const error =
+    loadError?.contentType === activeType ? loadError.message : null;
+  const items = result?.contentType === activeType ? result.items : [];
 
   useEffect(() => {
-    setLoading(true);
-    setError(null);
+    let active = true;
     collectionsApi
       .list({ content_type: activeType, page_size: 50 })
-      .then((res) => setItems(res.data.data.results ?? []))
-      .catch(() => setError("Failed to load content"))
-      .finally(() => setLoading(false));
+      .then((res) => {
+        if (!active) return;
+        setResult({
+          contentType: activeType,
+          items: res.data.data.results ?? [],
+        });
+        setLoadError(null);
+      })
+      .catch(() => {
+        if (active) {
+          setLoadError({
+            contentType: activeType,
+            message: "Failed to load content",
+          });
+        }
+      });
+    return () => {
+      active = false;
+    };
   }, [activeType]);
 
   const columns = buildColumns(activeType, onViewDetails, onDelete);

@@ -12,19 +12,43 @@ interface ExperienceDetailModalProps {
 }
 
 export default function ExperienceDetailModal({ experienceId, isOpen, onClose }: ExperienceDetailModalProps) {
-  const [experience, setExperience] = useState<ExperienceDetail | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [activeImage, setActiveImage] = useState(0);
+  const [result, setResult] = useState<{
+    experienceId: number;
+    experience: ExperienceDetail | null;
+  } | null>(null);
+  const [selectedImage, setSelectedImage] = useState<{
+    experienceId: number;
+    index: number;
+  } | null>(null);
+  const experience =
+    experienceId !== null && result?.experienceId === experienceId
+      ? result.experience
+      : null;
+  const loading =
+    isOpen &&
+    experienceId !== null &&
+    result?.experienceId !== experienceId;
+  const activeImage =
+    experienceId !== null && selectedImage?.experienceId === experienceId
+      ? selectedImage.index
+      : 0;
 
   useEffect(() => {
     if (!isOpen || experienceId === null) return;
-    setLoading(true);
-    setExperience(null);
-    setActiveImage(0);
+    let active = true;
     experiencesApi
       .retrieve(experienceId)
-      .then((res) => setExperience(res.data.data))
-      .finally(() => setLoading(false));
+      .then((res) => {
+        if (active) {
+          setResult({ experienceId, experience: res.data.data });
+        }
+      })
+      .catch(() => {
+        if (active) setResult({ experienceId, experience: null });
+      });
+    return () => {
+      active = false;
+    };
   }, [isOpen, experienceId]);
 
   if (!isOpen) return null;
@@ -81,7 +105,11 @@ export default function ExperienceDetailModal({ experienceId, isOpen, onClose }:
                     {images.map((_, i) => (
                       <button
                         key={i}
-                        onClick={() => setActiveImage(i)}
+                        onClick={() => {
+                          if (experienceId !== null) {
+                            setSelectedImage({ experienceId, index: i });
+                          }
+                        }}
                         className={`w-2 h-2 rounded-full transition-colors ${i === activeImage ? "bg-primary" : "bg-[#D9D9D9]"}`}
                       />
                     ))}

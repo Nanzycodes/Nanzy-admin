@@ -35,12 +35,21 @@ export default function ExperienceTable({ onViewDetails, onDelete }: ExperienceT
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setLoading(true);
+    let active = true;
     experiencesApi
       .list({ page_size: 50 })
-      .then((res) => setExperiences(res.data.data.results ?? []))
-      .catch(() => setError("Failed to load experiences"))
-      .finally(() => setLoading(false));
+      .then((res) => {
+        if (active) setExperiences(res.data.data.results ?? []);
+      })
+      .catch(() => {
+        if (active) setError("Failed to load experiences");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   const columns: ColumnDef<ExperienceList>[] = [
